@@ -88,7 +88,7 @@ void drpm_ar1_sppm(int *draws, int *burn, int *thin, int *nsubject, int *ntime,
 	// kk - second cluster iterate
 	// p - prediction iterate
 	
-	int i, ii, j, jj, t, k, kk, p;
+	int i, ii, j, jj, t, k, kk;
 	ii = 0;
 	
 	int nout = (*draws - *burn)/(*thin);

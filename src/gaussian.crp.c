@@ -50,25 +50,25 @@ static void gibbs_crp(double* y, int* n,
             double* llike, double* fitted, double* lpml, double* waic ){
 
 
-  int i, j, jj, k, ii, nk;
+  int i, j, jj, k, ii;
   int nout = (*niter - *nburn)/(*nthin);
   double M = *alpha;
 
   // scratch vectors to update parameters
   double denph, cprob, uu, sumy=0.0, summu;
-  double scr1[*n], ph[*n], sbw[*n], mnlike[*n], mnllike[*n], CPOinv[*n];
-  double mstar, vstar, astar, bstar, mudraw, sigdraw, maxph;
+  double ph[*n], mnlike[*n], mnllike[*n], CPOinv[*n];
+  double mstar, vstar, mudraw, sigdraw, maxph;
   double llo, lln, llr, osig, nsig, otau, ntau, auxs;
 
   double _lpml, elppdWAIC, _theta, _tau2;
-  double _mu[*n], _sigma2[*n], _w[*n], _like[*n], _fitted[*n];
+  double _mu[*n], _sigma2[*n], _like[*n], _fitted[*n];
   int _z[*n], nh[*n], _nclus=0, iaux; 
   
   /* Initialize variables */
   for(j = 0; j < *n; j++){
     _z[j] = rbinom(1, 0.25)+1;
-    _mu[k] = 0;
-    _sigma2[k] = 1;
+    _mu[j] = 0;
+    _sigma2[j] = 1;
     mnlike[j] = 0.0;
     mnllike[j] = 0.0;
     CPOinv[j] = 0.0;

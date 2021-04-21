@@ -52,24 +52,16 @@ void WDDP(int *draws, int *burn, int *thin, int *nobs, int *dim, int *N,
 
     int i, j, t, tt, d, ii, T, h;
 	int ncp=(*dim)*(*dim);
-	int df, ncomps;
+	int df;
 	
 //	RprintVecAsMat("Ymat", Ymat, *nobs, *dim);
 //	Rprintf("N = %d\n", *N);
-	int c1,c2, ipiv[*dim], ok, LDA, nout;
+	int nout;
 //	double matrix[dim*dim]  ;
 
     nout = (*draws - *burn)/(*thin);
 
-	c1 = *dim ;
-	c2 = 1 ;
-	LDA = *dim ;
-	int lwork = *dim ;
-	double work[lwork] ;
-
-	ncomps = *N;
-
-	double llo, lln, llr, uu, ld, detN, detO;
+	double uu, ld;
 
 	T = (*nobs)*(*dim);//Total number of observations
 	
@@ -142,7 +134,6 @@ void WDDP(int *draws, int *burn, int *thin, int *nobs, int *dim, int *N,
 
 	// Stuff to compute lpml, likelihood, WAIC, and Rao-Blackwellized density values
 	// and other model evaluation metrics
-	double dval, cumpval, sdens, mn, s2k;
 	double lpml_iter, elppdWAIC, muy, sxdens;
 	double Sigxy[(*dim)*(*dim)],  Sigxx[(*dim)*(*dim)], mux[*dim], xvec[*dim];
 	double condmn[*N], condvar[*N], xdens[*N], condweight[*N];
@@ -475,6 +466,16 @@ void WDDP(int *draws, int *burn, int *thin, int *nobs, int *dim, int *N,
 		    break;	
 		  }
 		}
+      }
+      
+      nclus_iter = 0;
+      for(j = 0; j < *nobs; j++){
+        for(h = 0; h < *N; h++){
+          if(Si_iter[j] == h+1){
+            nclus_iter = nclus_iter + 1;
+            break;
+          }
+        }
       }
 //      RprintIVecAsMat("Si_iter", Si_iter, 1, *nobs);
       

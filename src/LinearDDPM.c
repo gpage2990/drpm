@@ -85,7 +85,7 @@ void LDDP(int *draws, int *burn, int *thin, int *nobs, int *ncov,
 	// bb - second b-spline coefficient iterate
 	// g - xgrid iterate;
 	
-	int i, ii, j, jj, k, b, bb, g;
+	int i, ii, j, jj, k, b, bb;
 
 	Rprintf("nobs = %d\n", *nobs);
 
@@ -203,7 +203,7 @@ void LDDP(int *draws, int *burn, int *thin, int *nobs, int *ncov,
 
 
 	// stuff I need to update sig2h (player specific), beta0, Sig20;
-	double astar, bstar, ld, lln, llo, llr, so, sn;
+	double astar, bstar, ld, lln, llo, llr;
 
 	
 	// stuff I need to update betah, beta0
@@ -224,7 +224,6 @@ void LDDP(int *draws, int *burn, int *thin, int *nobs, int *ncov,
 	double *zerov = R_VectorInit(nb*nb, 0.0);
 
 	// Stuff to compute lpml, likelihood, WAIC, and Rao-Blackwellized density values
-	double dval, cumpval, sdens;
 	double lpml_iter, elppdWAIC;
 	double *CPOinv = R_VectorInit(*nobs, 0.0);
 	double *like_iter = R_VectorInit(*nobs, 0.0);
