@@ -67,7 +67,7 @@
 
 
 void drpm_ar1_sppm(int *draws, int *burn, int *thin, int *nsubject, int *ntime,
-			  double *y, double *s1, double *s2, double *M, 
+			  double *y, double *s1, double *s2, double *M, double *centering_partiiton,
 			  double *alpha, double *modelPriors, 
 			  int *global_alpha, int *update_alpha, int *update_eta1, int *update_phi1, 
 			  int *sPPM, int *SpatialCohesion, double *cParms, double *mh,
@@ -79,108 +79,107 @@ void drpm_ar1_sppm(int *draws, int *burn, int *thin, int *nsubject, int *ntime,
 
 
 
-	// i - MCMC iterate
-	// ii - MCMC iterate that is saved
-	// j - subject iterate
-	// jj - second subject iterate
-	// t - time iterate
-	// k - cluster iterate
-	// kk - second cluster iterate
-	// p - prediction iterate
+  // i - MCMC iterate
+  // ii - MCMC iterate that is saved
+  // j - subject iterate
+  // jj - second subject iterate
+  // t - time iterate
+  // k - cluster iterate
+  // kk - second cluster iterate
+  // p - prediction iterate
 	
-	int i, ii, j, jj, t, k, kk;
-	ii = 0;
+  int i, ii, j, jj, t, k, kk;
+  ii = 0;
 	
-	int nout = (*draws - *burn)/(*thin);
+  int nout = (*draws - *burn)/(*thin);
 
-	Rprintf("nsubject = %d\n", *nsubject);
-	Rprintf("ntime = %d\n", *ntime);
-	Rprintf("nout = %d\n", nout);
+  Rprintf("nsubject = %d\n", *nsubject);
+  Rprintf("ntime = %d\n", *ntime);
+  Rprintf("nout = %d\n", nout);
 
-	Rprintf("update_alpha = %d\n", *update_alpha);
-	Rprintf("update_eta1 = %d\n", *update_eta1);
-	Rprintf("update_phi1 = %d\n", *update_phi1);
+  Rprintf("update_alpha = %d\n", *update_alpha);
+  Rprintf("update_eta1 = %d\n", *update_eta1);
+  Rprintf("update_phi1 = %d\n", *update_phi1);
 
 	
 //	RprintVecAsMat("y = ", y, *nsubject, *ntime);
 	
 	
-	// ===================================================================================
-	// 
-	// Memory vectors to hold MCMC iterates for non cluster specific parameters
-	// 
-	// ===================================================================================
+  // ===================================================================================
+  // 
+  // Memory vectors to hold MCMC iterates for non cluster specific parameters
+  // 
+  // ===================================================================================
 
-	// This variable is used to create a "buffer" zone of memory so that updating 
-	// things on time boundary do not need special attention in the algorithm since
-	// I have to look at time period before and after when updating partitions
-	int ntime1 = *ntime + 1;
+  // This variable is used to create a "buffer" zone of memory so that updating 
+  // things on time boundary do not need special attention in the algorithm since
+  // I have to look at time period before and after when updating partitions
+  int ntime1 = *ntime + 1;
 
-	// I am adding one more year as an empty vector
-	// so that the C program does not crash.
-	int gamma_iter[(*nsubject)*(ntime1)];
-	int Si_iter[(*nsubject)*(ntime1)];
-	int nclus_iter[ntime1]; 
+  // I am adding one more year as an empty vector
+  // so that the C program does not crash.
+  int gamma_iter[(*nsubject)*(ntime1)];
+  int Si_iter[(*nsubject)*(ntime1)];
+  int nclus_iter[ntime1]; 
 
-	double *eta1_iter = R_VectorInit(*nsubject, runif(0,1));
-	double *theta_iter = R_VectorInit(ntime1, rnorm(0,3));
-	double *tau2_iter = R_VectorInit(ntime1, runif(0, modelPriors[3]*modelPriors[3]));
+  double *eta1_iter = R_VectorInit(*nsubject, runif(0,1));
+  double *theta_iter = R_VectorInit(ntime1, rnorm(0,3));
+  double *tau2_iter = R_VectorInit(ntime1, runif(0, modelPriors[3]*modelPriors[3]));
 
-	double phi0_iter = rnorm(0,3);
-	double phi1_iter = runif(0,1);
-	double lam2_iter = runif(0, modelPriors[4]*modelPriors[4]);
+  double phi0_iter = rnorm(0,3);
+  double phi1_iter = runif(0,1);
+  double lam2_iter = runif(0, modelPriors[4]*modelPriors[4]);
 
-	double *alpha_iter = R_VectorInit(ntime1, *alpha);	
+  double *alpha_iter = R_VectorInit(ntime1, *alpha);	
 	
-	// ===================================================================================
-	// 
-	// Memory vectors to hold MCMC iterates for cluster specific parameters
-	// 
-	// ===================================================================================
+  // ===================================================================================
+  // 
+  // Memory vectors to hold MCMC iterates for cluster specific parameters
+  // 
+  // ===================================================================================
 
-	double *muh = R_VectorInit((*nsubject)*(ntime1), 0.0);
-	double *sig2h = R_VectorInit((*nsubject)*(ntime1), 0.5);
-
-
-	int nh[(*nsubject)*(ntime1)];
+  double *muh = R_VectorInit((*nsubject)*(ntime1), 0.0);
+  double *sig2h = R_VectorInit((*nsubject)*(ntime1), 0.5);
 
 
-	// ===================================================================================
-	// 
-	// Initialize a few parameter vectors
-	// 
-	// ===================================================================================
+  int nh[(*nsubject)*(ntime1)];
 
-	// Initialize Si according to covariates
-	// I am adding one time period here to have
-	// scratch memory (never filled in) so that
-	// I can avoid dealing with boundaries in algorithm
-	for(j = 0; j < *nsubject; j++){ 
-		for(t = 0; t < ntime1; t++){ // Note I am not initializing the "added time memory"
-			Si_iter[j*(ntime1) + t] = 1;
-			gamma_iter[j*(ntime1) + t] = 0;
-			nh[j*(ntime1) + t] = 0;
-			if(t==1) Si_iter[j*ntime1 + t] = 1; 
-			if(t==*ntime) Si_iter[j*(ntime1) + t] = 0;
 
-		}
+  // ===================================================================================
+  // 
+  // Initialize a few parameter vectors
+  // 
+  // ===================================================================================
+
+  // Initialize Si according to covariates
+  // I am adding one time period here to have
+  // scratch memory (never filled in) so that
+  // I can avoid dealing with boundaries in algorithm
+  for(j = 0; j < *nsubject; j++){ 
+    for(t = 0; t < ntime1; t++){ // Note I am not initializing the "added time memory"
+	  Si_iter[j*(ntime1) + t] = 1;
+	  gamma_iter[j*(ntime1) + t] = 0;
+	  nh[j*(ntime1) + t] = 0;
+	  if(t==1) Si_iter[j*ntime1 + t] = 1; 
+	  if(t==*ntime) Si_iter[j*(ntime1) + t] = 0;
+    }
+  }
+
+  // Initial enumeration of number of subjects per cluster;
+  for(j = 0; j < *nsubject; j++){
+    for(t = 0; t < *ntime; t++){
+	  nh[(Si_iter[j*(ntime1)+t]-1)*(ntime1) + t] = nh[(Si_iter[j*(ntime1)+t]-1)*(ntime1) + t] + 1;
 	}
+  }	
 
-	// Initial enumeration of number of subjects per cluster;
-	for(j = 0; j < *nsubject; j++){
-		for(t = 0; t < *ntime; t++){
-			nh[(Si_iter[j*(ntime1)+t]-1)*(ntime1) + t] = nh[(Si_iter[j*(ntime1)+t]-1)*(ntime1) + t] + 1;
-		}
-	}	
-
-	// Initialize the number of clusters	
-	for(t = 0; t < *ntime; t++){
-	nclus_iter[t] = 0;
-		for(j = 0; j < *nsubject; j++){
-			if(nh[j*(ntime1) + t] > 0) nclus_iter[t] = nclus_iter[t] + 1;
-		}
+  // Initialize the number of clusters	
+  for(t = 0; t < *ntime; t++){
+    nclus_iter[t] = 0;
+    for(j = 0; j < *nsubject; j++){
+	  if(nh[j*(ntime1) + t] > 0) nclus_iter[t] = nclus_iter[t] + 1;
 	}
-	nclus_iter[*ntime] = 0;
+  }
+  nclus_iter[*ntime] = 0;
 
 //	RprintIVecAsMat("Si_iter", Si_iter, *nsubject, ntime1);
 //	RprintIVecAsMat("nclus_iter", nclus_iter, 1, ntime1);
@@ -188,734 +187,693 @@ void drpm_ar1_sppm(int *draws, int *burn, int *thin, int *nsubject, int *ntime,
 //	RprintIVecAsMat("gamma_iter", gamma_iter, *nsubject, ntime1);
 
 
+  // ===================================================================================		
+  //
+  // scratch vectors of memory needed to update parameters
+  //
+  // ===================================================================================
+
+  // stuff needed to update gamma vectors
+  int nclus_red=0, nh_red[*nsubject], n_red=0, gt, n_red_1=0, cit_1;
+  int nh_redtmp[*nsubject], nh_tmp[*nsubject];
+  int nh_redtmp_no_zero[*nsubject], nh_tmp_no_zero[*nsubject],nh_red_no_zero[*nsubject];
+  
+  int nh_red_1[*nsubject], nclus_red_1;
+  int nh_redtmp_1[*nsubject], nh_tmp_1[*nsubject];
+  int nh_redtmp_no_zero_1[*nsubject], nh_red_no_zero_1[*nsubject],nh_tmp_no_zero_1[*nsubject];
+  double *s1_red = R_VectorInit(*nsubject, 0.0);
+  double *s2_red = R_VectorInit(*nsubject, 0.0);
+  for(j=0; j<*nsubject; j++){
+    nh_tmp[j] = 0; nh_red[j] = 0; nh_redtmp[j] = 0;
+    nh_redtmp_no_zero[j] = 0;  nh_tmp_no_zero[j] = 0;
+    nh_red_no_zero[j] = 0; nh_red_no_zero_1[j] = 0;
+  	
+    nh_tmp_1[j] = 0; nh_red_1[j] = 0; nh_redtmp_1[j] = 0;
+    nh_redtmp_no_zero_1[j] = 0; nh_red_no_zero_1[j] = 0; nh_tmp_no_zero_1[j] = 0;
+  }
+
+  // stuff that I need to update Si (the parition);
+  int comp1t[(*nsubject)],comptm1[(*nsubject)],comp2t[(*nsubject)],comptp1[(*nsubject)];
+  int rho_tmp[*nsubject], Si_tmp[*nsubject], Si_tmp2[*nsubject];
+  int Si_red[*nsubject], Si_red_1[*nsubject];
+  int oldLab[*nsubject], reorder[*nsubject];
+  int iaux, Rindx1, Rindx2, n_tmp, nclus_tmp, rho_comp, indx;
+  double auxm, auxs, mudraw, sigdraw, maxph, denph, cprobh, uu, lCo, lCn, lCn_1, lpp;
+  double *ph = R_VectorInit(*nsubject, 0.0);
+  double *phtmp = R_VectorInit(*nsubject, 0.0);
+  double *probh = R_VectorInit(*nsubject, 0.0);
+  double *lgweight = R_VectorInit(*nsubject, 0.0);
+  double *s1o = R_Vector(*nsubject);
+  double *s2o = R_Vector(*nsubject);
+  double *s1n = R_Vector(*nsubject);
+  double *s2n = R_Vector(*nsubject);
+
+  for(j=0; j<(*nsubject); j++){
+    comp1t[j] = 0; comptm1[j] = 0, comp2t[j]=0, comptp1[j]=0;
+  }
+
+
+  // stuff I need to update eta1
+  double e1o, e1n, logito, logitn, one_phisq;
+
+  // stuff I need to update muh and sig2h
+  double mstar, s2star, sumy, sume2;
+  double nsig, osig, llo, lln, llr;
+  double *mu_tmp = R_VectorInit(*nsubject, 0.0);
+  double *sig2_tmp = R_VectorInit(*nsubject, 1.0);
 	
-
-
-	// ===================================================================================		
-	//
-	// scratch vectors of memory needed to update parameters
-	//
-	// ===================================================================================
-
-	// stuff needed to update gamma vectors
-	int nclus_red=0, nh_red[*nsubject], n_red=0, gt, n_red_1=0, cit_1;
-	int nh_redtmp[*nsubject], nh_tmp[*nsubject];
-	int nh_redtmp_no_zero[*nsubject], nh_tmp_no_zero[*nsubject],nh_red_no_zero[*nsubject];
-
-	int nh_red_1[*nsubject], nclus_red_1;
-	int nh_redtmp_1[*nsubject], nh_tmp_1[*nsubject];
-	int nh_redtmp_no_zero_1[*nsubject], nh_red_no_zero_1[*nsubject],nh_tmp_no_zero_1[*nsubject];
-	double *s1_red = R_VectorInit(*nsubject, 0.0);
-	double *s2_red = R_VectorInit(*nsubject, 0.0);
-	for(j=0; j<*nsubject; j++){
-		nh_tmp[j] = 0; nh_red[j] = 0; nh_redtmp[j] = 0;
-		nh_redtmp_no_zero[j] = 0;  nh_tmp_no_zero[j] = 0;
-		nh_red_no_zero[j] = 0; nh_red_no_zero_1[j] = 0;
-		
-		nh_tmp_1[j] = 0; nh_red_1[j] = 0; nh_redtmp_1[j] = 0;
-		nh_redtmp_no_zero_1[j] = 0; nh_red_no_zero_1[j] = 0; nh_tmp_no_zero_1[j] = 0;
-	}
-
-	// stuff that I need to update Si (the parition);
-	int comp1t[(*nsubject)],comptm1[(*nsubject)],comp2t[(*nsubject)],comptp1[(*nsubject)];
-	int rho_tmp[*nsubject], Si_tmp[*nsubject], Si_tmp2[*nsubject];
-	int Si_red[*nsubject], Si_red_1[*nsubject];
-	int oldLab[*nsubject], reorder[*nsubject];
-	int iaux, Rindx1, Rindx2, n_tmp, nclus_tmp, rho_comp, indx;
-	double auxm, auxs, mudraw, sigdraw, maxph, denph, cprobh, uu, lCo, lCn, lCn_1, lpp;
-	double *ph = R_VectorInit(*nsubject, 0.0);
-	double *phtmp = R_VectorInit(*nsubject, 0.0);
-	double *probh = R_VectorInit(*nsubject, 0.0);
-	double *lgweight = R_VectorInit(*nsubject, 0.0);
-	double *s1o = R_Vector(*nsubject);
-	double *s2o = R_Vector(*nsubject);
-	double *s1n = R_Vector(*nsubject);
-	double *s2n = R_Vector(*nsubject);
-
-	for(j=0; j<(*nsubject); j++){
-		comp1t[j] = 0; comptm1[j] = 0, comp2t[j]=0, comptp1[j]=0;
-	}
-
-
-	// stuff I need to update eta1
-	double e1o, e1n, logito, logitn, one_phisq;
-
-	// stuff I need to update muh and sig2h
-	double mstar, s2star, sumy, sume2;
-	double nsig, osig, llo, lln, llr;
-	double *mu_tmp = R_VectorInit(*nsubject, 0.0);
-	double *sig2_tmp = R_VectorInit(*nsubject, 1.0);
+  // stuff that I need for theta and lam2
+  double summu, nt, ot, lam2tmp, phi1sq, sumt, op1, np1, ssq, ol, nl;
 	
-	// stuff that I need for theta and lam2
-	double summu, nt, ot, lam2tmp, phi1sq, sumt, op1, np1, ssq, ol, nl;
+  // stuff that I need to update alpha
+  int sumg;
+  double astar, bstar,alpha_tmp;
 	
-	// stuff that I need to update alpha
-	int sumg;
-	double astar, bstar,alpha_tmp;
-	
-	// Stuff to compute lpml, likelihood, and WAIC
-	int like0, nout_0=0;
-	double lpml_iter, elppdWAIC;
-	double *CPO = R_VectorInit((*nsubject)*(ntime1), 0.0);
-	double *like_iter = R_VectorInit((*nsubject)*(ntime1), 0.0);
-	double *fitted_iter = R_VectorInit((*nsubject)*(ntime1), 0.0);
-	double *mnlike = R_VectorInit((*nsubject)*(ntime1), 0.0);
-	double *mnllike = R_VectorInit((*nsubject)*(ntime1), 0.0);
+  // Stuff to compute lpml, likelihood, and WAIC
+  int like0, nout_0=0;
+  double lpml_iter, elppdWAIC;
+  double *CPO = R_VectorInit((*nsubject)*(ntime1), 0.0);
+  double *like_iter = R_VectorInit((*nsubject)*(ntime1), 0.0);
+  double *fitted_iter = R_VectorInit((*nsubject)*(ntime1), 0.0);
+  double *mnlike = R_VectorInit((*nsubject)*(ntime1), 0.0);
+  double *mnllike = R_VectorInit((*nsubject)*(ntime1), 0.0);
 
-	// stuff to predict
-	int gpred[*nsubject], nh_pred[*nsubject];
+  // stuff to predict
+  int gpred[*nsubject], nh_pred[*nsubject];
 
 
-	// ===================================================================================		
-	//
-	// Prior parameter values
-	//
-	// ===================================================================================
+  // ===================================================================================		
+  //
+  // Prior parameter values
+  //
+  // ===================================================================================
 
-	// prior values for sig2
-	double Asig=modelPriors[2];
-	double Atau=modelPriors[3];
-    double Alam=modelPriors[4];
-	// priors for phi0
-	double m0 = modelPriors[0], s20 = modelPriors[1]; 
+  // prior values for sig2
+  double Asig=modelPriors[2];
+  double Atau=modelPriors[3];
+  double Alam=modelPriors[4];
+  // priors for phi0
+  double m0 = modelPriors[0], s20 = modelPriors[1]; 
 
-	// priors for alpha
-	double a = modelPriors[5], b = modelPriors[6];
+  // priors for alpha
+  double a = modelPriors[5], b = modelPriors[6];
 
-	//priors for eta1
-	double b_eta1 = modelPriors[7];
+  //priors for eta1
+  double b_eta1 = modelPriors[7];
 
 //	Rprintf("b_eta1 = %f\n", b_eta1);
 		
-	// DP weight parameter
-	double Mdp = *M;
+  // DP weight parameter
+  double Mdp = *M;
 
 //	Rprintf("Mdp = %f\n", Mdp);
 //	Rprintf("alpha = %f\n", *alpha);
 
 
 
-    Rprintf("Prior values: Asig = %.2f, Atau = %.2f, Alam = %.2f, \n m0 = %.2f, s20 = %.2f\n\n",
+  Rprintf("Prior values: Asig = %.2f, Atau = %.2f, Alam = %.2f, \n m0 = %.2f, s20 = %.2f\n\n",
              Asig, Atau, Alam, m0, s20);
 
 
 
-	// Cohesion auxiliary model paramaters for Cohesions 3 and 4
-	double k0=cParms[1], v0=cParms[2];
-	double *mu0 = R_VectorInit(2,cParms[0]);
-	double *L0 = R_VectorInit(2*2,0.0);
-	L0[0] = cParms[3]; L0[3] = cParms[3];
+  // Cohesion auxiliary model paramaters for Cohesions 3 and 4
+  double k0=cParms[1], v0=cParms[2];
+  double *mu0 = R_VectorInit(2,cParms[0]);
+  double *L0 = R_VectorInit(2*2,0.0);
+  L0[0] = cParms[3]; L0[3] = cParms[3];
 	
-	RprintVecAsMat("mu0", mu0, 1, 2);
-	Rprintf("k0 = %f\n", k0);
-	Rprintf("v0 = %f\n", v0);
-	RprintVecAsMat("L0", L0, 2, 2);
+  RprintVecAsMat("mu0", mu0, 1, 2);
+  Rprintf("k0 = %f\n", k0);
+  Rprintf("v0 = %f\n", v0);
+  RprintVecAsMat("L0", L0, 2, 2);
 
 
 //	RprintVecAsMat("mh", mh, 1, 5);
-	// M-H step tunning parameter
-	double csigSIG=mh[0], csigTAU=mh[1], csigLAM=mh[2], csigETA1=mh[3], csigPHI1=mh[4];
+  // M-H step tunning parameter
+  double csigSIG=mh[0], csigTAU=mh[1], csigLAM=mh[2], csigETA1=mh[3], csigPHI1=mh[4];
 
 //	Rprintf("csigETA1 = %f\n", csigETA1);
 
 
 
-	GetRNGstate();
+  GetRNGstate();
 
 
-	// ===================================================================================
-	//
-	// start of the mcmc algorithm;
-	//
-	// ===================================================================================
+  // ===================================================================================
+  //
+  // start of the mcmc algorithm;
+  //
+  // ===================================================================================
 	
-	for(i = 0; i < *draws; i++){
+  for(i = 0; i < *draws; i++){
 
-		if((i+1) % 100000 == 0){
-			time_t now;
-			time(&now);
+    if((i+1) % 100000 == 0){
+	  time_t now;
+	  time(&now);
 
-			Rprintf("mcmc iter = %d =========================================== \n", i+1);
-			Rprintf("%s", ctime(&now));
+	  Rprintf("mcmc iter = %d =========================================== \n", i+1);
+	  Rprintf("%s", ctime(&now));
 
-//			RprintVecAsMat("alpha_iter", alpha_iter, 1, *ntime);
+//	  RprintVecAsMat("alpha_iter", alpha_iter, 1, *ntime);
+
+	}
+
+//	Rprintf("*ntime = %d\n", *ntime);
+
+	// Start updating gamma and partition for each time period
+	for(t = 0; t < *ntime; t++){
+			
+//	  Rprintf("t = %d\n", t);
+
+			
+//	  RprintIVecAsMat("nh", nh, *nsubject, ntime1);
+//	  RprintIVecAsMat("Si", Si_iter, *nsubject, ntime1);
+//	  RprintIVecAsMat("gamma", gamma_iter, *nsubject, ntime1);
+//	  Rprintf("nclus_iter[t] = %d\n", nclus_iter[t]);
+
+
+
+	  //////////////////////////////////////////////////////////////////////////////
+	  // 
+	  // begin by updating gamma (pegged) parameters
+	  //
+	  //////////////////////////////////////////////////////////////////////////////
+
+
+	  for(j = 0; j < *nsubject; j++){
+//	    Rprintf("t = %d\n", t);
+//	    Rprintf("j ====================================== %d\n", j);
+
+
+
+		// at time period one, all gammas are zero (none are ``pegged'')
+		if(t == 0){
+		  gamma_iter[j*(ntime1) + t] = 0;
+		} else {
+
+
+//		RprintIVecAsMat("Si", Si_iter, *nsubject, ntime1);
+//		RprintIVecAsMat("gamma", gamma_iter, *nsubject, ntime1);
+
+
+		//////////////////////////////////////////////////////////////////////
+		// find the reduced partition information 
+		// i.e., vector of cluster labels;
+		//////////////////////////////////////////////////////////////////////
+
+		Rindx1 = 0;
+		for(jj = 0; jj < *nsubject; jj++){
+		  if(gamma_iter[jj*ntime1 + (t)] == 1){
+		    if(jj != j){
+		      Si_tmp[Rindx1] = Si_iter[jj*ntime1 + (t)];
+			  Si_tmp2[Rindx1] = Si_iter[jj*ntime1 + (t)];
+			  comptm1[Rindx1] = Si_iter[jj*ntime1 + (t-1)];
+
+			  // Also get the reduced spatial coordinates if
+			  // space is included
+			  if(*sPPM==1){
+			    if((*space_1==1 & t == 0) | (*space_1==0)){
+			      s1_red[Rindx1] = s1[jj];
+				  s2_red[Rindx1] = s2[jj];
+			    }
+			  }
+			  Rindx1 = Rindx1 + 1;
+		    }
+		  }
+		}	
+		Si_tmp2[Rindx1] = Si_iter[j*ntime1 + (t)];
+		comptm1[Rindx1] = Si_iter[j*ntime1 + (t-1)];
+
+		n_red = Rindx1;
+		n_red_1 = Rindx1 + 1;
+
+//		Rprintf("n_red = %d\n", n_red);
+//		Rprintf("n_red_1 = %d\n", n_red_1);
+
+		relabel(Si_tmp, *nsubject, Si_red, reorder, oldLab);			
+		relabel(Si_tmp2, *nsubject, Si_red_1, reorder, oldLab);			
+
+//		RprintIVecAsMat("Si_red",Si_red, 1, Rindx1);
+//		RprintIVecAsMat("Si_red_1",Si_red_1, 1, Rindx1+1);
+//		RprintIVecAsMat("comptm1",comptm1, 1, Rindx1+1);
+
+//		RprintVecAsMat("s1_red",s1_red, 1, Rindx1);
+//		RprintVecAsMat("s2_red",s2_red, 1, Rindx1);
+
+		// I need to keep the relabeled cluster label for the pegged
+		// individual so that I know what lgweight to keep in the 
+		// full conditional.
+		cit_1 = Si_red_1[Rindx1];
+					
+//		Rprintf("cit_1 = %d\n", cit_1);
+					
+
+		for(jj = 0; jj < n_red_1; jj++){
+		  nh_red[jj]=0; nh_red_1[jj]=0;			
+		}
+
+		nclus_red = 0;
+		for(jj = 0; jj < n_red; jj++){
+		  nh_red[Si_red[jj]-1] = nh_red[Si_red[jj]-1] + 1; 
+		  nh_red_1[Si_red_1[jj]-1] = nh_red_1[Si_red_1[jj]-1] + 1; 
+
+		  if(Si_red[jj] > nclus_red) nclus_red = Si_red[jj];
+		}
+					
+		nh_red_1[Si_red_1[n_red]-1]= nh_red_1[Si_red_1[n_red]-1] + 1;			
+		// this may need to be updated depending on if the value of gamma changes
+
+		nclus_red_1 = nclus_red;
+
+		if(Si_red_1[n_red] > nclus_red) nclus_red_1 = Si_red_1[n_red]; 
+
+//		  Rprintf("nclus_red = %d\n", nclus_red);
+//		  Rprintf("nclus_red_1 = %d\n", nclus_red_1);
+//		  RprintIVecAsMat("nh_red",nh_red, 1, nclus_red);
+//		  RprintIVecAsMat("nh_red_1",nh_red_1, 1, nclus_red_1);
+
+
+		  lCo=0.0, lCn=0.0;
+		  for(k = 0; k < nclus_red; k++){
+//		    Rprintf("k = %d\n", k);
+			if(*sPPM==1){
+			  if((*space_1==1 & t == 0) | (*space_1==0)){
+			    indx = 0;
+				for(jj = 0; jj < n_red; jj++){
+				  if(Si_red[jj] == k+1){							
+				    s1o[indx] = s1_red[jj];
+					s2o[indx] = s2_red[jj];
+	
+					s1n[indx] = s1_red[jj];
+					s2n[indx] = s2_red[jj];
+
+					indx = indx+1;
+ 				  }
+				}
+				s1n[indx] = s1[j];
+				s2n[indx] = s2[j];
+
+//				RprintVecAsMat("s1o", s1o, 1, nh_red[k]);
+//				RprintVecAsMat("s2o", s2o, 1, nh_red[k]);
+
+//				RprintVecAsMat("s1n", s1n, 1, nh_red[k]+1);
+//				RprintVecAsMat("s2n", s2n, 1, nh_red[k]+1);
+								
+				lCo = Cohesion3_4(s1o, s2o, mu0, k0, v0, L0, nh_red[k], *SpatialCohesion, 1);
+				lCn = Cohesion3_4(s1n, s2n, mu0, k0, v0, L0, nh_red[k]+1,*SpatialCohesion, 1);
+			  }
+			}
+//			Rprintf("lCo = %f\n", lCo);
+//			Rprintf("lCn = %f\n", lCn);
+
+//			Rprintf("nh_red[k] = %d\n", nh_red[k]);
+						
+			lgweight[k] = log(nh_red[k]) + lCn - lCo;
+//			Rprintf("lgweight = %f\n", lgweight[k]);
+
+			Si_red_1[Rindx1] = k+1;
+
+//			RprintIVecAsMat("comptm1",comptm1, 1, Rindx1+1);
+//			RprintIVecAsMat("Si_red_1",Si_red_1, 1, Rindx1+1);
+
+			rho_comp = compatibility(Si_red_1, comptm1, Rindx1+1);
+
+//			Rprintf("rho_comp = %d\n", rho_comp);
+
+//			if(rho_comp==0) lgweight[k] = log(0);
+
+//			Rprintf("lgweight = %f\n", lgweight[k]);
+		  }
+						
+					
+//		  RprintVecAsMat("lgweight", lgweight, 1, nclus_red);
+
+		  // What if pegged subject creates a singleton in the reduced partition?
+		  lCn_1=0.0;
+		  if(*sPPM==1){
+		    if((*space_1==1 & t == 0) | (*space_1==0)){
+			  s1o[0] = s1[j]; 
+			  s2o[0] = s2[j]; 
+			  lCn_1 = Cohesion3_4(s1o, s2o, mu0, k0, v0, L0, 1,*SpatialCohesion, 1);
+			}
+		  }
+
+//		  Rprintf("lCn_1 = %f\n", lCn_1);
+
+//		  Rprintf("k = %d\n", k+1)
+		  lgweight[nclus_red] = log(Mdp) +  lCn_1;
+					
+		  Si_red_1[Rindx1] = nclus_red+1;
+
+//		  RprintIVecAsMat("comptm1",comptm1, 1, Rindx1+1);
+//		  RprintIVecAsMat("Si_red_1",Si_red_1, 1, Rindx1+1);
+
+		  rho_comp = compatibility(Si_red_1, comptm1, Rindx1+1);
+
+// 		  if(rho_comp == 0) lgweight[nclus_red] = log(0);
+					
+//		  RprintVecAsMat("lgweight", lgweight, 1, nclus_red + 1);
+							
+		  denph = 0.0;
+		  for(k = 0; k < nclus_red + 1; k++){
+		    phtmp[k] = lgweight[k] ;
+		  }
+//		  RprintVecAsMat("phtmp", phtmp, 1, nclus_red + 1);
+
+	
+		  R_rsort(phtmp,  nclus_red + 1) ;
+	
+//		  RprintVecAsMat("phtmp ", phtmp, 1, nclus_red + 1);
+						
+//		  Rprintf("nclus_red_1 = %d\n", nclus_red_1);	
+		  maxph = phtmp[nclus_red];
+//		  Rprintf("maxph = %f\n", maxph);
+
+		  denph = 0.0;
+		  for(k = 0; k < nclus_red + 1; k++){
+							
+		    lgweight[k] = exp(lgweight[k] - maxph);
+		    denph = denph + lgweight[k];
+		  }
+//		  RprintVecAsMat("lgweight ", lgweight, 1, nclus_red + 1);
+//		  Rprintf("denph = %f\n", denph);
+					
+		  for(k = 0; k < nclus_red + 1; k++){
+		    lgweight[k] = lgweight[k]/denph;
+		  }
+//		  RprintVecAsMat("lgweight", lgweight, 1, nclus_red + 1);
+				
+//		  RprintIVecAsMat("nh_red_no_zero", nh_red_no_zero, 1, *nsubject);
+
+
+//		  Rprintf("alpha_iter[t] = %f\n", alpha_iter[t]);
+//		  Rprintf("n_red_1 = %d\n", n_red_1);
+//		  RprintIVecAsMat("Si_red_1",Si_red_1, 1, Rindx1+1);
+//		  Rprintf("Si_red_1[n_red_1] = %d\n", Si_red_1[n_red_1]);
+//		  Rprintf("lgweight[Si_red_1[n_red_1-1]-1] = %f\n", lgweight[Si_red_1[n_red_1-1]-1]);
+
+					
+
+		  probh[1] = alpha_iter[t]/(alpha_iter[t] + (1-alpha_iter[t])*lgweight[cit_1-1]);
+
+//		  Rprintf("probh[1] = %f\n", probh[1]);
+
+
+		  // If gamma is 1 at current MCMC iterate, then there are no 
+		  // concerns about partitions being incompatible as gamma changes 
+		  // from 1 to 0.
+		  //
+		  // However, if gamma's current value is 0, then care must be taken when
+		  // trying to change from gamma=0 to gamma=1 as the partitions may
+		  // no longer be compatible
+
+//		  RprintIVecAsMat("nh_red", nh_red, 1, *nsubject);
+//		  Rprintf("gamma_iter[j*(ntime1) + t] = %d\n", gamma_iter[j*(ntime1) + t]);
+		  if(gamma_iter[j*(ntime1) + t] == 0){
+						
+		    // To determine compatibility, I need to make sure that 
+			// comparison of the reduced partitios is being made with 
+			// correct cluster labeling.  I try to do this by identifying 
+			// the sets of units and sequentially assigning "cluster labels" 
+			// starting with set that contains the first unit. I wonder if 
+			// there is a way to do this in C with out using loops?  Who
+			// can I ask about this?
+
+			// Get rho_t | gamma_t = 1 and rho_{t-1} | gamma_t = 1
+			// when gamma_{it} = 1;
+			Rindx1 = 0;
+			for(jj = 0; jj < *nsubject; jj++){
+		      if(gamma_iter[jj*ntime1 + (t)] == 1){
+			    comptm1[Rindx1] = Si_iter[jj*ntime1 + (t-1)];
+				comp1t[Rindx1] = Si_iter[jj*ntime1 + (t)];
+				Rindx1 = Rindx1 + 1;
+			  }
+			  // I need to include this because determine what happens when 
+			  // gamma goes from 0 to 1;
+			  if(jj == j){ 
+			    comptm1[Rindx1] = Si_iter[jj*ntime1 + (t-1)];
+				comp1t[Rindx1] = Si_iter[jj*ntime1 + (t)];
+				Rindx1 = Rindx1 + 1;
+			  }							
+			}
+
+//			Rprintf("Rindx1 = %d\n", Rindx1);
+//			RprintIVecAsMat("comptm1", comptm1, 1, *nsubject);
+//			RprintIVecAsMat("comp1t", comp1t, 1, *nsubject);
+
+			rho_comp = compatibility(comptm1, comp1t, Rindx1);
+
+//			Rprintf("rho_comp = %d\n", rho_comp);
+
+			// If rho_comp = 0 then not compatible and probability of
+			// pegging subject needs to be set to 0;
+			if(rho_comp==0){
+			  probh[1] = 0;
+			}
+	
+		  }
+
+
+
+//		  Rprintf("probh[1] = %f\n", probh[1]);
+										
+		  gt = rbinom(1,probh[1]);
+					
+//		  Rprintf("gt = %d\n", gt);
+		  gamma_iter[j*(ntime1) + t] = gt;
 
 		}
 
-//		Rprintf("*ntime = %d\n", *ntime);
 
-		// Start updating gamma and partition for each time period
-		for(t = 0; t < *ntime; t++){
+
+//		Rprintf("gamma_iter[j*(ntime1) + t] = %d\n", gamma_iter[j*(ntime1) + t]);
+//		Rprintf("nclus_red = %d\n", nclus_red);
+//		Rprintf("n_red = %d\n", n_red);
+//		RprintIVecAsMat("nh_red = ", nh_red, 1, *nsubject);	
+//		RprintIVecAsMat("gamma_iter", gamma_iter, *nsubject, ntime1);
+//		RprintIVecAsMat("Si_iter", Si_iter, *nsubject, ntime1);
+
+	  }
+
+
+//	  RprintIVecAsMat("Si_iter", Si_iter, *nsubject, ntime1);
+//	  RprintIVecAsMat("gamma_iter", gamma_iter, *nsubject, ntime1);
+
+
+//	  Rprintf("Begin updating partition for time %d\n", t+1);
+
+
+	  //////////////////////////////////////////////////////////////////////////////
+	  // 
+	  // update partition 
+	  //
+	  //////////////////////////////////////////////////////////////////////////////
+	  // The cluster probabilities depend on four partition probabilities
+	  //
+	  // rho_t
+	  // rho_t.R
+	  // rho_t+1
+	  // rho_t+1.R
+	  //
+	  // I have switched a number of times on which of these needs to be computed
+	  // and which one can be absorbed in the normalizing constant.  Right now I am 
+	  // leaning towards Pr(rho_t+1) and Pr(rho_t+1.R) can be absorbed.  But I need 
+	  // to use rho_t.R and rho_t+1.R to check compatibility as I update rho_t.  
+	  //
+	  //////////////////////////////////////////////////////////////////////////////////
+
+	  for(jj = 0; jj < *nsubject; jj++){
+	    rho_tmp[jj] = Si_iter[jj*(ntime1) + t];
+	  }
+
+
+	  // It seems to me that I can use some of the structure used to carry
+	  // out Algorithm 8 from previous code to keep track of empty clusters
+	  // etc.  
+	  for(j = 0; j < *nsubject; j++){
+//	    Rprintf("t ======= %d\n", t);	
+//		Rprintf("j ================================= %d\n", j);
+
+//		RprintIVecAsMat("rho_tmp", rho_tmp, 1, *nsubject);
+//		RprintIVecAsMat("gamma_iter", gamma_iter, *nsubject, ntime1);
+//		RprintIVecAsMat("Si_iter", Si_iter, *nsubject, ntime1);
+
+		// Only need to update partition relative to units that are not pegged
+		if(gamma_iter[j*(ntime1) + t] == 0){
+
+		  if(nh[(Si_iter[j*(ntime1) + t]-1)*(ntime1) + t] > 1){
+		  		
+		    // Observation belongs to a non-singleton ...
+		    nh[(Si_iter[j*(ntime1) + t]-1)*(ntime1) + t] = nh[(Si_iter[j*(ntime1) + t]-1)*(ntime1) + t] - 1;
+		  		
+		  }else{
 			
-//			Rprintf("t = %d\n", t);
-
-			
-//			RprintIVecAsMat("nh", nh, *nsubject, ntime1);
-//			RprintIVecAsMat("Si", Si_iter, *nsubject, ntime1);
-//			RprintIVecAsMat("gamma", gamma_iter, *nsubject, ntime1);
-//			Rprintf("nclus_iter[t] = %d\n", nclus_iter[t]);
-
-
-
-			//////////////////////////////////////////////////////////////////////////////
-			// 
-			// begin by updating gamma (pegged) parameters
-			//
-			//////////////////////////////////////////////////////////////////////////////
-
-
-			for(j = 0; j < *nsubject; j++){
-//				Rprintf("t = %d\n", t);
-//				Rprintf("j ====================================== %d\n", j);
-
-
-
-				// at time period one, all gammas are zero (none are ``pegged'')
-				if(t == 0){
-					gamma_iter[j*(ntime1) + t] = 0;
-				} else {
-
-
-//					RprintIVecAsMat("Si", Si_iter, *nsubject, ntime1);
-//					RprintIVecAsMat("gamma", gamma_iter, *nsubject, ntime1);
-
-
-					//////////////////////////////////////////////////////////////////////
-					// find the reduced partition information 
-					// i.e., vector of cluster labels;
-					//////////////////////////////////////////////////////////////////////
-
-					Rindx1 = 0;
-					for(jj = 0; jj < *nsubject; jj++){
-						if(gamma_iter[jj*ntime1 + (t)] == 1){
-							if(jj != j){
-								Si_tmp[Rindx1] = Si_iter[jj*ntime1 + (t)];
-								Si_tmp2[Rindx1] = Si_iter[jj*ntime1 + (t)];
-								comptm1[Rindx1] = Si_iter[jj*ntime1 + (t-1)];
-
-								// Also get the reduced spatial coordinates if
-								// space is included
-								if(*sPPM==1){
-									if((*space_1==1 & t == 0) | (*space_1==0)){
-										s1_red[Rindx1] = s1[jj];
-										s2_red[Rindx1] = s2[jj];
-									}
-								}
-
-								Rindx1 = Rindx1 + 1;
-							}
-
-						}
-					}	
-					Si_tmp2[Rindx1] = Si_iter[j*ntime1 + (t)];
-					comptm1[Rindx1] = Si_iter[j*ntime1 + (t-1)];
-
-					n_red = Rindx1;
-					n_red_1 = Rindx1 + 1;
-
-//					Rprintf("n_red = %d\n", n_red);
-//					Rprintf("n_red_1 = %d\n", n_red_1);
-
-
-					relabel(Si_tmp, *nsubject, Si_red, reorder, oldLab);			
-					relabel(Si_tmp2, *nsubject, Si_red_1, reorder, oldLab);			
-
-//					RprintIVecAsMat("Si_red",Si_red, 1, Rindx1);
-//					RprintIVecAsMat("Si_red_1",Si_red_1, 1, Rindx1+1);
-//					RprintIVecAsMat("comptm1",comptm1, 1, Rindx1+1);
-
-//					RprintVecAsMat("s1_red",s1_red, 1, Rindx1);
-//					RprintVecAsMat("s2_red",s2_red, 1, Rindx1);
-
-					// I need to keep the relabeled cluster label for the pegged
-					// individual so that I know what lgweight to keep in the 
-					// full conditional.
-					cit_1 = Si_red_1[Rindx1];
-					
-//					Rprintf("cit_1 = %d\n", cit_1);
-					
-
-					for(jj = 0; jj < n_red_1; jj++){
-						nh_red[jj]=0; nh_red_1[jj]=0;			
-					}
-
-					nclus_red = 0;
-					for(jj = 0; jj < n_red; jj++){
-						nh_red[Si_red[jj]-1] = nh_red[Si_red[jj]-1] + 1; 
-						nh_red_1[Si_red_1[jj]-1] = nh_red_1[Si_red_1[jj]-1] + 1; 
-
-						if(Si_red[jj] > nclus_red) nclus_red = Si_red[jj];
-					}
-					
-					nh_red_1[Si_red_1[n_red]-1]= nh_red_1[Si_red_1[n_red]-1] + 1;			
-					// this may need to be updated depending on if the value of gamma changes
-
-					nclus_red_1 = nclus_red;
-
-					if(Si_red_1[n_red] > nclus_red) nclus_red_1 = Si_red_1[n_red]; 
-
-//					Rprintf("nclus_red = %d\n", nclus_red);
-//					Rprintf("nclus_red_1 = %d\n", nclus_red_1);
-
-//					RprintIVecAsMat("nh_red",nh_red, 1, nclus_red);
-//					RprintIVecAsMat("nh_red_1",nh_red_1, 1, nclus_red_1);
-
-
-					lCo=0.0, lCn=0.0;
-					for(k = 0; k < nclus_red; k++){
-//						Rprintf("k = %d\n", k);
-						if(*sPPM==1){
-							if((*space_1==1 & t == 0) | (*space_1==0)){
-								indx = 0;
-								for(jj = 0; jj < n_red; jj++){
-									if(Si_red[jj] == k+1){							
-										s1o[indx] = s1_red[jj];
-										s2o[indx] = s2_red[jj];
-	
-										s1n[indx] = s1_red[jj];
-										s2n[indx] = s2_red[jj];
-
-										indx = indx+1;
- 									}
-								}
-								s1n[indx] = s1[j];
-								s2n[indx] = s2[j];
-
-//								RprintVecAsMat("s1o", s1o, 1, nh_red[k]);
-//								RprintVecAsMat("s2o", s2o, 1, nh_red[k]);
-
-//								RprintVecAsMat("s1n", s1n, 1, nh_red[k]+1);
-//								RprintVecAsMat("s2n", s2n, 1, nh_red[k]+1);
-								
-								lCo = Cohesion3_4(s1o, s2o, mu0, k0, v0, L0, nh_red[k], *SpatialCohesion, 1);
-								lCn = Cohesion3_4(s1n, s2n, mu0, k0, v0, L0, nh_red[k]+1,*SpatialCohesion, 1);
-							}
-						}
-//						Rprintf("lCo = %f\n", lCo);
-//						Rprintf("lCn = %f\n", lCn);
-
-//						Rprintf("nh_red[k] = %d\n", nh_red[k]);
-						
-						lgweight[k] = log(nh_red[k]) + lCn - lCo;
-//						Rprintf("lgweight = %f\n", lgweight[k]);
-
-						Si_red_1[Rindx1] = k+1;
-
-//						RprintIVecAsMat("comptm1",comptm1, 1, Rindx1+1);
-//						RprintIVecAsMat("Si_red_1",Si_red_1, 1, Rindx1+1);
-
-						rho_comp = compatibility(Si_red_1, comptm1, Rindx1+1);
-
-//						Rprintf("rho_comp = %d\n", rho_comp);
-
-//						if(rho_comp==0) lgweight[k] = log(0);
-
-//						Rprintf("lgweight = %f\n", lgweight[k]);
-					}
-						
-					
-//					RprintVecAsMat("lgweight", lgweight, 1, nclus_red);
-
-					// What if pegged subject creates a singleton in the reduced partition?
-					lCn_1=0.0;
-					if(*sPPM==1){
-						if((*space_1==1 & t == 0) | (*space_1==0)){
-		
-							s1o[0] = s1[j]; 
-							s2o[0] = s2[j]; 
-							lCn_1 = Cohesion3_4(s1o, s2o, mu0, k0, v0, L0, 1,*SpatialCohesion, 1);
-						}
-					}
-
-//					Rprintf("lCn_1 = %f\n", lCn_1);
-
-//					Rprintf("k = %d\n", k+1)
-					lgweight[nclus_red] = log(Mdp) +  lCn_1;
-					
-					Si_red_1[Rindx1] = nclus_red+1;
-
-//					RprintIVecAsMat("comptm1",comptm1, 1, Rindx1+1);
-//					RprintIVecAsMat("Si_red_1",Si_red_1, 1, Rindx1+1);
-
-					rho_comp = compatibility(Si_red_1, comptm1, Rindx1+1);
-
-// 					if(rho_comp == 0) lgweight[nclus_red] = log(0);
-					
-//					RprintVecAsMat("lgweight", lgweight, 1, nclus_red + 1);
-							
-					denph = 0.0;
-					for(k = 0; k < nclus_red + 1; k++){
-						phtmp[k] = lgweight[k] ;
-					}
-//					RprintVecAsMat("phtmp", phtmp, 1, nclus_red + 1);
-
-	
-					R_rsort(phtmp,  nclus_red + 1) ;
-	
-//					RprintVecAsMat("phtmp ", phtmp, 1, nclus_red + 1);
-						
-//					Rprintf("nclus_red_1 = %d\n", nclus_red_1);	
-					maxph = phtmp[nclus_red];
-//					Rprintf("maxph = %f\n", maxph);
-
-					denph = 0.0;
-					for(k = 0; k < nclus_red + 1; k++){
-							
-						lgweight[k] = exp(lgweight[k] - maxph);
-						denph = denph + lgweight[k];
-					}
-//					RprintVecAsMat("lgweight ", lgweight, 1, nclus_red + 1);
-//					Rprintf("denph = %f\n", denph);
-					
-					for(k = 0; k < nclus_red + 1; k++){
-
-						lgweight[k] = lgweight[k]/denph;
-
-					}
-//					RprintVecAsMat("lgweight", lgweight, 1, nclus_red + 1);
+		  // Observation is a member of a singleton cluster ...
 				
-//					RprintIVecAsMat("nh_red_no_zero", nh_red_no_zero, 1, *nsubject);
-
-
-//					Rprintf("alpha_iter[t] = %f\n", alpha_iter[t]);
-//					Rprintf("n_red_1 = %d\n", n_red_1);
-//					RprintIVecAsMat("Si_red_1",Si_red_1, 1, Rindx1+1);
-//					Rprintf("Si_red_1[n_red_1] = %d\n", Si_red_1[n_red_1]);
-//					Rprintf("lgweight[Si_red_1[n_red_1-1]-1] = %f\n", lgweight[Si_red_1[n_red_1-1]-1]);
-
-					
-
-					probh[1] = alpha_iter[t]/(alpha_iter[t] + (1-alpha_iter[t])*lgweight[cit_1-1]);
-
-//					Rprintf("probh[1] = %f\n", probh[1]);
-
-
-					// If gamma is 1 at current MCMC iterate, then there are no 
-					// concerns about partitions being incompatible as gamma changes 
-					// from 1 to 0.
-					//
-					// However, if gamma's current value is 0, then care must be taken when
-					// trying to change from gamma=0 to gamma=1 as the partitions may
-					// no longer be compatible
-
-//					RprintIVecAsMat("nh_red", nh_red, 1, *nsubject);
-//					Rprintf("gamma_iter[j*(ntime1) + t] = %d\n", gamma_iter[j*(ntime1) + t]);
-					if(gamma_iter[j*(ntime1) + t] == 0){
-						
-						// To determine compatibility, I need to make sure that 
-						// comparison of the reduced partitios is being made with 
-						// correct cluster labeling.  I try to do this by identifying 
-						// the sets of units and sequentially assigning "cluster labels" 
-						// starting with set that contains the first unit. I wonder if 
-						// there is a way to do this in C with out using loops?  Who
-						// can I ask about this?
-
-						// Get rho_t | gamma_t = 1 and rho_{t-1} | gamma_t = 1
-						// when gamma_{it} = 1;
-						Rindx1 = 0;
-						for(jj = 0; jj < *nsubject; jj++){
-							if(gamma_iter[jj*ntime1 + (t)] == 1){
-								comptm1[Rindx1] = Si_iter[jj*ntime1 + (t-1)];
-								comp1t[Rindx1] = Si_iter[jj*ntime1 + (t)];
-								Rindx1 = Rindx1 + 1;
-							}
-							// I need to include this because determine what happens when 
-							// gamma goes from 0 to 1;
-							if(jj == j){ 
-								comptm1[Rindx1] = Si_iter[jj*ntime1 + (t-1)];
-								comp1t[Rindx1] = Si_iter[jj*ntime1 + (t)];
-								Rindx1 = Rindx1 + 1;
-							}							
-						}
-
-//						Rprintf("Rindx1 = %d\n", Rindx1);
-//						RprintIVecAsMat("comptm1", comptm1, 1, *nsubject);
-//						RprintIVecAsMat("comp1t", comp1t, 1, *nsubject);
-
-						rho_comp = compatibility(comptm1, comp1t, Rindx1);
-
-//						Rprintf("rho_comp = %d\n", rho_comp);
-
-						// If rho_comp = 0 then not compatible and probability of
-						// pegging subject needs to be set to 0;
-						if(rho_comp==0){
-							probh[1] = 0;
-						}
-	
-					}
-
-
-
-//					Rprintf("probh[1] = %f\n", probh[1]);
-										
-					gt = rbinom(1,probh[1]);
-					
-//					Rprintf("gt = %d\n", gt);
-					gamma_iter[j*(ntime1) + t] = gt;
-
-				}
-
-
-
-//				Rprintf("gamma_iter[j*(ntime1) + t] = %d\n", gamma_iter[j*(ntime1) + t]);
-//				Rprintf("nclus_red = %d\n", nclus_red);
-//				Rprintf("n_red = %d\n", n_red);
-//				RprintIVecAsMat("nh_red = ", nh_red, 1, *nsubject);	
-//				RprintIVecAsMat("gamma_iter", gamma_iter, *nsubject, ntime1);
-//				RprintIVecAsMat("Si_iter", Si_iter, *nsubject, ntime1);
-
-			}
-
-
-//			RprintIVecAsMat("Si_iter", Si_iter, *nsubject, ntime1);
-//			RprintIVecAsMat("gamma_iter", gamma_iter, *nsubject, ntime1);
-
-
-//			Rprintf("Begin updating partition for time %d\n", t+1);
-
-
-			//////////////////////////////////////////////////////////////////////////////
-			// 
-			// update partition 
-			//
-			//////////////////////////////////////////////////////////////////////////////
-			// The cluster probabilities depend on four partition probabilities
-			//
-			// rho_t
-			// rho_t.R
-			// rho_t+1
-			// rho_t+1.R
-			//
-			// I have switched a number of times on which of these needs to be computed
-			// and which one can be absorbed in the normalizing constant.  Right now I am 
-			// leaning towards Pr(rho_t+1) and Pr(rho_t+1.R) can be absorbed.  But I need 
-			// to use rho_t.R and rho_t+1.R to check compatibility as I update rho_t.  
-			//
-			//////////////////////////////////////////////////////////////////////////////////
-
+		  iaux = Si_iter[j*(ntime1) + t];
+//		  Rprintf("iaux = %d\n", iaux);
+		  if(iaux < nclus_iter[t]){
+		    // Need to relabel clusters. I will do this by swapping cluster labels
+			// Si_iter[j] and nclus_iter along with cluster specific parameters;
+				
+			// All members of last cluster will be assigned subject j's label
 			for(jj = 0; jj < *nsubject; jj++){
+			  if(Si_iter[jj*(ntime1) + t] == nclus_iter[t]){
+			    Si_iter[jj*(ntime1) + t] = iaux; 
+		      }
+		    }
+					
 				
-				rho_tmp[jj] = Si_iter[jj*(ntime1) + t];
+			Si_iter[j*(ntime1) + t] = nclus_iter[t];
 
-			}
-
-
-			// It seems to me that I can use some of the structure used to carry
-			// out Algorithm 8 from previous code to keep track of empty clusters
-			// etc.  
-			for(j = 0; j < *nsubject; j++){
-//				Rprintf("t ======= %d\n", t);	
-//				Rprintf("j ================================= %d\n", j);
-
-//				RprintIVecAsMat("rho_tmp", rho_tmp, 1, *nsubject);
-//				RprintIVecAsMat("gamma_iter", gamma_iter, *nsubject, ntime1);
-//				RprintIVecAsMat("Si_iter", Si_iter, *nsubject, ntime1);
-
-				// Only need to update partition relative to units that are not pegged
-				if(gamma_iter[j*(ntime1) + t] == 0){
-
-					if(nh[(Si_iter[j*(ntime1) + t]-1)*(ntime1) + t] > 1){
-				
-						// Observation belongs to a non-singleton ...
-						nh[(Si_iter[j*(ntime1) + t]-1)*(ntime1) + t] = nh[(Si_iter[j*(ntime1) + t]-1)*(ntime1) + t] - 1;
-				
-					}else{
+            // The following steps swaps order of cluster specific parameters
+            // so that the newly labeled subjects from previous step retain
+            // their correct cluster specific parameters
+            auxs = sig2h[(iaux-1)*ntime1 + t];
+            sig2h[(iaux-1)*ntime1 + t] = sig2h[(nclus_iter[t]-1)*(ntime1)+t];
+            sig2h[(nclus_iter[t]-1)*(ntime1)+t] = auxs;
+            
+            auxm = muh[(iaux-1)*ntime1 + t];
+            muh[(iaux-1)*ntime1 + t] = muh[(nclus_iter[t]-1)*(ntime1)+t];
+            muh[(nclus_iter[t]-1)*(ntime1)+t] = auxm;
+            
+            
+            // the number of members in cluster is also swapped with the last
+            nh[(iaux-1)*(ntime1)+t] = nh[(nclus_iter[t]-1)*(ntime1)+t];
+            nh[(nclus_iter[t]-1)*(ntime1)+t] = 1;
 			
-						// Observation is a member of a singleton cluster ...
-				
-						iaux = Si_iter[j*(ntime1) + t];
-//						Rprintf("iaux = %d\n", iaux);
-						if(iaux < nclus_iter[t]){
-				
-							// Need to relabel clusters. I will do this by swapping cluster labels
-							// Si_iter[j] and nclus_iter along with cluster specific parameters;
-				
-				
-							// All members of last cluster will be assigned subject j's label
-							for(jj = 0; jj < *nsubject; jj++){
+		  }
+			
+		  // Now remove the ith obs and last cluster;
+		  nh[(nclus_iter[t]-1)*(ntime1)+t] = nh[(nclus_iter[t]-1)*(ntime1)+t] - 1;
+		  nclus_iter[t] = nclus_iter[t] - 1;
+		}
+
+		for(jj = 0; jj < *nsubject; jj++){
+		  rho_tmp[jj] = Si_iter[jj*(ntime1) + t];
+		}
+
+//		RprintIVecAsMat("Si_iter", Si_iter, *nsubject, ntime1);
+//		RprintIVecAsMat("nh ", nh,  *nsubject, ntime1);
+//		RprintIVecAsMat("rho_tmp", rho_tmp, 1, *nsubject);
+//		Rprintf("nclus_iter[t] = %d\n", nclus_iter[t]);
+
+		for(k = 0; k < nclus_iter[t]; k++){
+//		  Rprintf("k ======================= %d\n\n", k);
+		  rho_tmp[j] = k+1;
+					
+//		  RprintIVecAsMat("rho_tmp", rho_tmp, 1, *nsubject);
+//		  RprintIVecAsMat("gamma_iter", gamma_iter, *nsubject, ntime1);
+//		  RprintIVecAsMat("Si_iter", Si_iter, *nsubject, ntime1);
+
+
+		  // First need to check compatability
+		  Rindx2=0;
+		  for(jj = 0; jj < *nsubject; jj++){
+		    if(gamma_iter[jj*ntime1 + (t+1)] == 1){
+		      comp2t[Rindx2] = rho_tmp[jj];
+		      comptp1[Rindx2] = Si_iter[jj*ntime1 + (t+1)];
+		      Rindx2 = Rindx2 + 1;
+		    }	
+		  }
+//		  Rprintf("Rindx2 = %d\n", Rindx2);
+//		  RprintIVecAsMat("comp2t", comp2t, 1, *nsubject);
+//		  RprintIVecAsMat("comptp1", comptp1, 1, *nsubject);
+
+		  // check for compatibility
+		  rho_comp = compatibility(comp2t, comptp1, Rindx2);
+
+//		  Rprintf("rho_comp = %d\n", rho_comp);
+
+		  if(rho_comp != 1){
+		    ph[k] = log(0); // Not compatible					
+		  } else { 
+		  // Need to compute Pr(rhot), Pr(rhot.R), Pr(rhot+1), Pr(rhot+1.R)
 						
-								if(Si_iter[jj*(ntime1) + t] == nclus_iter[t]){
+		  for(jj = 0; jj < *nsubject; jj++){
+		    nh_tmp[jj] = 0;
+		  }
+
+		  n_tmp = 0;
+
+		  for(jj = 0; jj < *nsubject; jj++){
+		    nh_tmp[rho_tmp[jj]-1] = nh_tmp[rho_tmp[jj]-1]+1;
+			n_tmp=n_tmp+1;
+		  }
+
+//		  Rprintf("n_tmp = %d\n",n_tmp);
+//		  Rprintf("nsubject = %d\n", *nsubject);
 						
-									Si_iter[jj*(ntime1) + t] = iaux; 
+		  nclus_tmp=0;
+		  for(jj = 0; jj < *nsubject; jj++){
+		    if(nh_tmp[jj] > 0) nclus_tmp = nclus_tmp + 1;
+		  }
+					
+//		  Rprintf("nclus_tmp = %d\n", nclus_tmp);
+//		  RprintIVecAsMat("nh_tmp", nh_tmp, 1, nclus_tmp);
 							
-								}
-						
-							}
-					
-				
-							Si_iter[j*(ntime1) + t] = nclus_iter[t];
-
-							// The following steps swaps order of cluster specific parameters
-							// so that the newly labeled subjects from previous step retain
-							// their correct cluster specific parameters
-							auxs = sig2h[(iaux-1)*ntime1 + t];
-							sig2h[(iaux-1)*ntime1 + t] = sig2h[(nclus_iter[t]-1)*(ntime1)+t];
-							sig2h[(nclus_iter[t]-1)*(ntime1)+t] = auxs;
-
-							auxm = muh[(iaux-1)*ntime1 + t];
-							muh[(iaux-1)*ntime1 + t] = muh[(nclus_iter[t]-1)*(ntime1)+t];
-							muh[(nclus_iter[t]-1)*(ntime1)+t] = auxm;
-
-				
-							// the number of members in cluster is also swapped with the last
-							nh[(iaux-1)*(ntime1)+t] = nh[(nclus_iter[t]-1)*(ntime1)+t];
-							nh[(nclus_iter[t]-1)*(ntime1)+t] = 1;
-			
-						}
-			
-			
-						// Now remove the ith obs and last cluster;
-						nh[(nclus_iter[t]-1)*(ntime1)+t] = nh[(nclus_iter[t]-1)*(ntime1)+t] - 1;
-						nclus_iter[t] = nclus_iter[t] - 1;
-			
-			
-					}
-
-					for(jj = 0; jj < *nsubject; jj++){
-					
-						rho_tmp[jj] = Si_iter[jj*(ntime1) + t];
-
-					}
-
-//					RprintIVecAsMat("Si_iter", Si_iter, *nsubject, ntime1);
-//					RprintIVecAsMat("nh ", nh,  *nsubject, ntime1);
-//					RprintIVecAsMat("rho_tmp", rho_tmp, 1, *nsubject);
-			
-//					Rprintf("nclus_iter[t] = %d\n", nclus_iter[t]);
-
-
-
-					for(k = 0; k < nclus_iter[t]; k++){
-//						Rprintf("k ======================= %d\n\n", k);
-
-
-						rho_tmp[j] = k+1;
-					
-//						RprintIVecAsMat("rho_tmp", rho_tmp, 1, *nsubject);
-//						RprintIVecAsMat("gamma_iter", gamma_iter, *nsubject, ntime1);
-//						RprintIVecAsMat("Si_iter", Si_iter, *nsubject, ntime1);
-
-
-						// First need to check compatability
-						Rindx2=0;
-						for(jj = 0; jj < *nsubject; jj++){
-							if(gamma_iter[jj*ntime1 + (t+1)] == 1){
-								comp2t[Rindx2] = rho_tmp[jj];
-								comptp1[Rindx2] = Si_iter[jj*ntime1 + (t+1)];
-								Rindx2 = Rindx2 + 1;
-							}	
-						}
-
-
-//						Rprintf("Rindx2 = %d\n", Rindx2);
-//						RprintIVecAsMat("comp2t", comp2t, 1, *nsubject);
-//						RprintIVecAsMat("comptp1", comptp1, 1, *nsubject);
-
-						// check for compatibility
-						rho_comp = compatibility(comp2t, comptp1, Rindx2);
-
-//						Rprintf("rho_comp = %d\n", rho_comp);
-
-
-						if(rho_comp != 1){
-
-							ph[k] = log(0); // Not compatible					
-
-						} else { 
-							// Need to compute Pr(rhot), Pr(rhot.R), Pr(rhot+1), Pr(rhot+1.R)
-						
-							for(jj = 0; jj < *nsubject; jj++){
-								nh_tmp[jj] = 0;
-							}
-
-							n_tmp = 0;
-
-							for(jj = 0; jj < *nsubject; jj++){
-								nh_tmp[rho_tmp[jj]-1] = nh_tmp[rho_tmp[jj]-1]+1;
-								n_tmp=n_tmp+1;
-
-							}
-
-//							Rprintf("n_tmp = %d\n",n_tmp);
-//							Rprintf("nsubject = %d\n", *nsubject);
-						
-							nclus_tmp=0;
-							for(jj = 0; jj < *nsubject; jj++){
-								if(nh_tmp[jj] > 0) nclus_tmp = nclus_tmp + 1;
-								
-							}
-					
-//							Rprintf("nclus_tmp = %d\n", nclus_tmp);
-//							RprintIVecAsMat("nh_tmp", nh_tmp, 1, nclus_tmp);
-							
-							lpp = 0.0;
-							for(kk = 0; kk < nclus_tmp; kk++){
-//								Rprintf("kk = %d\n", kk);
-
-								// Beginning of spatial part
-								lCn = 0.0;
-								if(*sPPM==1){
-									if((*space_1==1 & t == 0) | (*space_1==0)){
-										indx = 0;
-										for(jj = 0; jj < *nsubject; jj++){
-				
-											if(rho_tmp[jj] == kk+1){
-					
-//												Rprintf("indx = %d\n", indx);
-
-												s1n[indx] = s1[jj];
-												s2n[indx] = s2[jj];
-
-												indx = indx+1;
-											}
-				
-										}
+		  lpp = 0.0;
+		  for(kk = 0; kk < nclus_tmp; kk++){
+//		    Rprintf("kk = %d\n", kk);
+		    // Beginning of spatial part
+		    lCn = 0.0;
+		    if(*sPPM==1){
+			  if((*space_1==1 & t == 0) | (*space_1==0)){
+			    indx = 0;
+				for(jj = 0; jj < *nsubject; jj++){
+				  if(rho_tmp[jj] == kk+1){					
+//				    Rprintf("indx = %d\n", indx);
+					s1n[indx] = s1[jj];
+					s2n[indx] = s2[jj];
+					indx = indx+1;
+				  }
+				}
 //
-//										Rprintf("Cohesion = %d\n", *SpatialCohesion);
-//										Rprintf("indx = %d\n", indx);
-//										Rprintf("nh_tmp[kk] = %d\n", nh_tmp[kk]);
-//										RprintVecAsMat("s1n", s1n, 1, nh_tmp[kk]);
-//										RprintVecAsMat("s2n", s2n, 1, nh_tmp[kk]);
+//				Rprintf("Cohesion = %d\n", *SpatialCohesion);
+//				Rprintf("indx = %d\n", indx);
+//				Rprintf("nh_tmp[kk] = %d\n", nh_tmp[kk]);
+//				RprintVecAsMat("s1n", s1n, 1, nh_tmp[kk]);
+//				RprintVecAsMat("s2n", s2n, 1, nh_tmp[kk]);
 
-										lCn = Cohesion3_4(s1n, s2n, mu0, k0, v0, L0, nh_tmp[kk],*SpatialCohesion, 1);
+				lCn = Cohesion3_4(s1n, s2n, mu0, k0, v0, L0, nh_tmp[kk],*SpatialCohesion, 1);
 
-//										Rprintf("lCn = %f\n", lCn);
+//				Rprintf("lCn = %f\n", lCn);
 
-									}
-								}
-								// End of spatial part
+			  }
+			}
+			// End of spatial part
 
-//								Rprintf("lCn = %f\n", lCn);
-//								Rprintf("nh_tmp[kk] = %d\n", nh_tmp[kk]);
-//								Rprintf("lCn = %f\n", lCn);
-//								Rprintf("lgamma(nh_tmp[kk]) = %f\n", lgamma((double) nh_tmp[kk]));
+//			Rprintf("lCn = %f\n", lCn);
+//			Rprintf("nh_tmp[kk] = %d\n", nh_tmp[kk]);
+//			Rprintf("lCn = %f\n", lCn);
+//			Rprintf("lgamma(nh_tmp[kk]) = %f\n", lgamma((double) nh_tmp[kk]));
 
 							
-//								lpp = lpp + nclus_tmp*log(Mdp) + lgamma((double) nh_tmp[kk]) + lCn;
-//								lpp = lpp + nh_tmp[kk]*log(Mdp) + lgamma((double) nh_tmp[kk]) + lCn;
-								lpp = lpp + (log(Mdp) + lgamma((double) nh_tmp[kk]) + lCn);
+//			lpp = lpp + nclus_tmp*log(Mdp) + lgamma((double) nh_tmp[kk]) + lCn;
+//			lpp = lpp + nh_tmp[kk]*log(Mdp) + lgamma((double) nh_tmp[kk]) + lCn;
+			lpp = lpp + (log(Mdp) + lgamma((double) nh_tmp[kk]) + lCn);
 
-//								Rprintf("lpp = %f\n", lpp);
+//			Rprintf("lpp = %f\n", lpp);
 							
-							}
-//							Rprintf("lpp = %f\n", lpp);
-//							Rprintf("muh[k*(ntime1) + t] = %f\n", muh[k*(ntime1) + t]);
-//							Rprintf("sigh[k*(ntime1) + t] = %f\n", sqrt(sig2h[k*(ntime1) + t]));
-//							Rprintf("y[j*(*ntime) + t] = %f\n", y[j*(*ntime) + t]);
-//							Rprintf("nh[k] = %d\n", nh_tmp[k]);
-//							Rprintf("dnorm(y[j*(*ntime) + t], muh[k*(ntime1) + t], sqrt(sig2h[k*(ntime1) + t]), 1) = %f\n", dnorm(y[j*(*ntime) + t], muh[k*(ntime1) + t], sqrt(sig2h[k*(ntime1) + t]), 1));
+		  }
+//		  Rprintf("lpp = %f\n", lpp);
+//		  Rprintf("muh[k*(ntime1) + t] = %f\n", muh[k*(ntime1) + t]);
+//		  Rprintf("sigh[k*(ntime1) + t] = %f\n", sqrt(sig2h[k*(ntime1) + t]));
+//		  Rprintf("y[j*(*ntime) + t] = %f\n", y[j*(*ntime) + t]);
+//		  Rprintf("nh[k] = %d\n", nh_tmp[k]);
+//		  Rprintf("dnorm(y[j*(*ntime) + t], muh[k*(ntime1) + t], sqrt(sig2h[k*(ntime1) + t]), 1) = %f\n", dnorm(y[j*(*ntime) + t], muh[k*(ntime1) + t], sqrt(sig2h[k*(ntime1) + t]), 1));
 
 
-							if(t==0){
-//								Rprintf("t = %d\n", t);
-//								Rprintf("Logdnorm = %f\n", dnorm(y[j*(*ntime) + t], 
-//								               muh[k*(ntime1) + t], 
-//								               sqrt(sig2h[k*(ntime1) + t]), 1));
+		  if(t==0){
+//		    Rprintf("t = %d\n", t);
+//			Rprintf("Logdnorm = %f\n", dnorm(y[j*(*ntime) + t], 
+//								             muh[k*(ntime1) + t], 
+//								             sqrt(sig2h[k*(ntime1) + t]), 1));
 
-								ph[k] = dnorm(y[j*(*ntime) + t], 
-								               muh[k*(ntime1) + t], 
-								               sqrt(sig2h[k*(ntime1) + t]), 1) + 
-											lpp;
+			ph[k] = dnorm(y[j*(*ntime) + t], 
+							muh[k*(ntime1) + t], 
+							sqrt(sig2h[k*(ntime1) + t]), 1) + 
+					lpp;
 
 
 							}

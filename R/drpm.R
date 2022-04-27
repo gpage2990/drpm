@@ -7,7 +7,7 @@
 # 3 - temporal dependenc in the partition model
 # 4 - Spatial information in the partition model.
 
-drpm_fit <- function(y,s_coords=NULL, M=1,
+drpm_fit <- function(y,s_coords=NULL, M=1, centering_partition=NULL,
 					alpha_0=FALSE,eta1_0=FALSE,phi1_0=FALSE,global_alpha=TRUE,
 					modelPriors=c(0,100^2,1,1,1,1,1,1),
 					SpatialCohesion=4,
@@ -32,7 +32,7 @@ drpm_fit <- function(y,s_coords=NULL, M=1,
 	lpml <- waic <- rep(0,1)
 
 	sPPM <- ifelse(is.null(s1), FALSE, TRUE)
-
+  if(is.null(centering_partition)) centering_partition <- 0
 	cat("sPPM = ", sPPM, "\n")
 
 #if(!sPPM){
@@ -68,7 +68,7 @@ drpm_fit <- function(y,s_coords=NULL, M=1,
       as.integer(draws), as.integer(burn),as.integer(thin),
       as.integer(nsubject),as.integer(ntime),
       as.double(t(y)), as.double(s1), as.double(s2),
-      as.double(M), as.double(alpha),
+      as.double(M), as.double(centering_partition), as.double(alpha),
       as.double(modelPriors),as.integer(global_alpha),
       as.integer(update_alpha), as.integer(update_eta1), as.integer(update_phi1),
       as.integer(sPPM), as.integer(SpatialCohesion), as.double(cParms),

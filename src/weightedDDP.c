@@ -440,6 +440,7 @@ void WDDP(int *draws, int *burn, int *thin, int *nobs, int *dim, int *N,
 //          RprintVecAsMat("ytmp", ytmp, 1, *dim);
 //          RprintVecAsMat("mutmp", mutmp, 1, *dim);
 //          RprintVecAsMat("iSigtmp", iSigtmp, *dim, *dim);
+//          Rprintf("ldet[h] = %f\n", ldet[h]);
 //          Rprintf("dmvnorm(ytmp, mutmp, iSigtmp, *dim, ldet[h], tmp1, 1) = %f\n", dmvnorm(ytmp, mutmp, iSigtmp, *dim, ldet[h], tmp1, 1));
 
 		  ph[h] = dmvnorm(ytmp, mutmp, iSigtmp, *dim, ldet[h], tmp1, 1) + log(sbweight[h]);
@@ -455,27 +456,25 @@ void WDDP(int *draws, int *burn, int *thin, int *nobs, int *dim, int *N,
 		  ph[h] = exp(ph[h] - maxp);
 		  den = den + ph[h];
 		}
+//        RprintVecAsMat("ph", ph, 1, *N);
+
+		for(h = 0; h < *N; h++){
+		  ph[h] = ph[h]/den;
+		}
+//        RprintVecAsMat("ph", ph, 1, *N);
 
 
 		uu = runif(0.0,1.0);
 		cprobh= 0.0;;
 		for(h = 0; h < *N; h++){
-		  cprobh = cprobh + ph[h]/den;
+		  cprobh = cprobh + ph[h];
+//		  Rprintf("cprobh = %f\n", cprobh);
 		  if(uu < cprobh){
 		    Si_iter[j] = h+1;
 		    break;	
 		  }
 		}
-      }
-      
-      nclus_iter = 0;
-      for(j = 0; j < *nobs; j++){
-        for(h = 0; h < *N; h++){
-          if(Si_iter[j] == h+1){
-            nclus_iter = nclus_iter + 1;
-            break;
-          }
-        }
+//	    Rprintf("Si_iter[j] = %d\n", Si_iter[j]);
       }
 //      RprintIVecAsMat("Si_iter", Si_iter, 1, *nobs);
       
@@ -546,8 +545,10 @@ void WDDP(int *draws, int *burn, int *thin, int *nobs, int *dim, int *N,
 //          Rprintf("h = %d\n", h);
           muy = mu_iter[h*(*dim) + 0];
           for(t = 1; t < *dim; t++){
+//            Rprintf("t = %d\n", t);
             mux[t-1] = mu_iter[h*(*dim) + t];
             for(tt = 1; tt < *dim ; tt++){
+//              Rprintf("tt = %d\n", tt);
 //              Rprintf("h*ncp + t*(*dim) + tt = %d\n", h*ncp + t*(*dim) + tt);
               Sigxx[(t-1)*(*dim - 1) + (tt-1)] = Sigma_iter[h*ncp + t*(*dim) + tt];
             }
