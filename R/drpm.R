@@ -8,6 +8,7 @@
 # 4 - Spatial information in the partition model.
 
 drpm_fit <- function(y,s_coords=NULL, M=1, centering_partition=NULL,
+					starting_alpha=0.5,
 					alpha_0=FALSE,eta1_0=FALSE,phi1_0=FALSE,global_alpha=TRUE,
 					modelPriors=c(0,100^2,1,1,1,1,1,1),
 					SpatialCohesion=4,
@@ -18,8 +19,11 @@ drpm_fit <- function(y,s_coords=NULL, M=1, centering_partition=NULL,
 
 	nout <- (draws-burn)/thin
 
-  ntime = ncol(y)
 	nsubject = nrow(y)
+	if(!is.null(centering_partition)){
+	  y <- cbind(rep(0, nsubject), y)
+	}
+	ntime = ncol(y)
 
 	s1 <- s_coords[,1]; s2 <- s_coords[,2]
 
@@ -60,7 +64,7 @@ drpm_fit <- function(y,s_coords=NULL, M=1, centering_partition=NULL,
 
 #if(sPPM){
 	space_1 <- FALSE;
-	alpha <- 0.0
+	alpha <- starting_alpha
 	update_alpha <- ifelse(alpha_0==TRUE, 0, 1)
 	update_eta1 <- ifelse(eta1_0==TRUE, 0, 1)
 	update_phi1 <- ifelse(phi1_0==TRUE, 0, 1)
@@ -68,7 +72,7 @@ drpm_fit <- function(y,s_coords=NULL, M=1, centering_partition=NULL,
       as.integer(draws), as.integer(burn),as.integer(thin),
       as.integer(nsubject),as.integer(ntime),
       as.double(t(y)), as.double(s1), as.double(s2),
-      as.double(M), as.double(centering_partition), as.double(alpha),
+      as.double(M), as.integer(centering_partition), as.double(alpha),
       as.double(modelPriors),as.integer(global_alpha),
       as.integer(update_alpha), as.integer(update_eta1), as.integer(update_phi1),
       as.integer(sPPM), as.integer(SpatialCohesion), as.double(cParms),
