@@ -103,8 +103,8 @@ void drpm_ar1_sppm(int *draws, int *burn, int *thin, int *nsubject, int *ntime,
   
   int cp = centering_partition[0];
   Rprintf("cp = %d\n", centering_partition[0]);
-  RprintIVecAsMat("cp_vec", centering_partition, 1, *nsubject);	
-  RprintVecAsMat("y = ", y, *nsubject, *ntime);
+//  RprintIVecAsMat("cp_vec", centering_partition, 1, *nsubject);	
+//  RprintVecAsMat("y = ", y, *nsubject, *ntime);
 	
 	
   // ===================================================================================
@@ -191,10 +191,10 @@ void drpm_ar1_sppm(int *draws, int *burn, int *thin, int *nsubject, int *ntime,
   }
   nclus_iter[*ntime] = 0;
 
-  RprintIVecAsMat("Si_iter", Si_iter, *nsubject, ntime1);
-  RprintIVecAsMat("nclus_iter", nclus_iter, 1, ntime1);
-  RprintIVecAsMat("nh", nh, *nsubject, ntime1);
-  RprintIVecAsMat("gamma_iter", gamma_iter, *nsubject, ntime1);
+//  RprintIVecAsMat("Si_iter", Si_iter, *nsubject, ntime1);
+//  RprintIVecAsMat("nclus_iter", nclus_iter, 1, ntime1);
+//  RprintIVecAsMat("nh", nh, *nsubject, ntime1);
+//  RprintIVecAsMat("gamma_iter", gamma_iter, *nsubject, ntime1);
 
  
   // ===================================================================================		
@@ -325,6 +325,12 @@ void drpm_ar1_sppm(int *draws, int *burn, int *thin, int *nsubject, int *ntime,
 //	Rprintf("csigETA1 = %f\n", csigETA1);
 
 
+  // If there is no centering partition, then proceed as normal
+  // so we set ts = 0.  If there is a centering partition, then
+  // I want to start updating at time point 1 since time point
+  // 0 contains the centered partition and gamma_t = 1 at t=0;
+  ts=0;
+  if(cp!=0) ts=1;
 
   GetRNGstate();
 
@@ -382,7 +388,7 @@ void drpm_ar1_sppm(int *draws, int *burn, int *thin, int *nsubject, int *ntime,
 		  
 		  // This next line is crucial for the case when 
 		  // there is a centering partition supplied.  Here we
-		  // set the gamma_1 = 1, so that they centering partition
+		  // set the gamma_1 = 1, so that the centering partition
 		  // doesn't change. 
 		  if(cp != 0) gamma_iter[j*(ntime1) + t] = 1;
         } else {
@@ -456,7 +462,7 @@ void drpm_ar1_sppm(int *draws, int *burn, int *thin, int *nsubject, int *ntime,
 		  for(k = 0; k < nclus_red; k++){
 //		    Rprintf("k = %d\n", k);
 			if(*sPPM==1){
-			  if((*space_1==1 & t == 0) | (*space_1==0)){
+			  if((*space_1==1 & t == ts) | (*space_1==0)){
 			    indx = 0;
 				for(jj = 0; jj < n_red; jj++){
 				  if(Si_red[jj] == k+1){							
@@ -505,7 +511,7 @@ void drpm_ar1_sppm(int *draws, int *burn, int *thin, int *nsubject, int *ntime,
 		  // What if pegged subject creates a singleton in the reduced partition?
 		  lCn_1=0.0;
 		  if(*sPPM==1){
-		    if((*space_1==1 & t == 0) | (*space_1==0)){
+		    if((*space_1==1 & t == ts) | (*space_1==0)){
 			  s1o[0] = s1[j]; 
 			  s2o[0] = s2[j]; 
 			  lCn_1 = Cohesion3_4(s1o, s2o, mu0, k0, v0, L0, 1,*SpatialCohesion, 1);
@@ -796,7 +802,7 @@ void drpm_ar1_sppm(int *draws, int *burn, int *thin, int *nsubject, int *ntime,
 		        // Beginning of spatial part
 		        lCn = 0.0;
 		        if(*sPPM==1){
-			      if((*space_1==1 & t == 0) | (*space_1==0)){
+			      if((*space_1==1 & t == ts) | (*space_1==0)){
 			        indx = 0;
 				    for(jj = 0; jj < *nsubject; jj++){
 				      if(rho_tmp[jj] == kk+1){					
@@ -825,7 +831,7 @@ void drpm_ar1_sppm(int *draws, int *burn, int *thin, int *nsubject, int *ntime,
 		      }
 
 
-		      if(t==0){
+		      if(t==ts){
 
                 ph[k] = dnorm(y[j*(*ntime) + t], 
 							  muh[k*(ntime1) + t], 
@@ -834,7 +840,7 @@ void drpm_ar1_sppm(int *draws, int *burn, int *thin, int *nsubject, int *ntime,
            
 
 		      }
-              if(t > 0){
+              if(t > ts){
 
                 ph[k] = dnorm(y[j*(*ntime) + t], 
 							  muh[k*(ntime1) + t] + eta1_iter[j]*y[j*(*ntime) + t-1], 
@@ -943,7 +949,7 @@ void drpm_ar1_sppm(int *draws, int *burn, int *thin, int *nsubject, int *ntime,
 		      // Beginning of spatial part
 		      lCn = 0.0;
 		      if(*sPPM==1){
-		        if((*space_1==1 & t == 0) | (*space_1==0)){
+		        if((*space_1==1 & t == ts) | (*space_1==0)){
 		          indx = 0;
 		          for(jj = 0; jj < *nsubject; jj++){
 				
@@ -983,12 +989,12 @@ void drpm_ar1_sppm(int *draws, int *burn, int *thin, int *nsubject, int *ntime,
 //          Rprintf("lCn = %f\n", lCn);
 //	        Rprintf("lpp = %f\n", lpp);
 						
-	        if(t==0){
+	        if(t==ts){
 	          ph[nclus_iter[t]] = dnorm(y[j*(*ntime) + t], mudraw, sigdraw, 1) + 
 		                          lpp;
 	        }
 
-	        if(t > 0){
+	        if(t > ts){
 	          ph[nclus_iter[t]] = dnorm(y[j*(*ntime) + t], 
                                    mudraw + eta1_iter[j]*y[j*(*ntime) + t-1], 
 							       sigdraw*sqrt(1-eta1_iter[j]*eta1_iter[j]), 1) + 
@@ -1150,12 +1156,6 @@ void drpm_ar1_sppm(int *draws, int *burn, int *thin, int *nsubject, int *ntime,
 
 
 
-      // If there is no centering partition, then proceed as normal
-      // so we set ts = 0.  If there is a centering partition, then
-      // I want to start updating at time point 1 since time point
-      // 0 contains the centered partition and gamma_t = 1 at t=0;
-      ts=0;
-      if(cp!=0) ts=1;
 
 
 
