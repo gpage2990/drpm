@@ -9,7 +9,8 @@ drpm_fit(y,
          eta1_0=FALSE,
          phi1_0=FALSE,
          global_alpha=TRUE,
-         modelPriors=c(0,100^2,1,1,1,1,1,1),
+         modelPriors=c(0,100^2,1,1,1,1),
+         alphaPriors=c(1,1),
          SpatialCohesion=4,
          cParms=c(0, 1, 2, 1),
          mh=c(0.5, 1, 0.1, 0.1, 0.1),
@@ -47,11 +48,12 @@ drpm_fit(y,
 	\item {A - upper bound on sigma }
 	\item {At - upper bound on tau }
 	\item {Al - Upper bound on lambda }
-	\item {at - shape 1 beta prior parameter for alpha }
-	\item {bt - shape 2 beta prior parameter for alpha }
 	\item {be - scale prior for xi}
   }
 }
+\item{alphaPriors}{Matrix containing beta prior values for the alpha parameters.  The columns correspond to the 1st and 2nd shape beta shape parameters.  The number of rows corresponds to the number of clusters in the centering partition.  If no centering partition is supplied then this only the first row is used.
+}
+
 \item{SpatialCohesion}{Logical indicating what cohesion to use if spatial coordinates are provided
 \itemize{
 \item {3 - auxiliary similarity }

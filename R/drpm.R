@@ -11,6 +11,7 @@ drpm_fit <- function(y,s_coords=NULL, M=1, centering_partition=NULL,
 					starting_alpha=0.5,
 					alpha_0=FALSE,eta1_0=FALSE,phi1_0=FALSE,global_alpha=TRUE,
 					modelPriors=c(0,100^2,1,1,1,1,1,1),
+					alphaPriors=c(1,1),
 					SpatialCohesion=4,
 					cParms=c(0, 1, 2, 1),
 					mh=c(0.5, 1, 0.1, 0.1, 0.1),
@@ -68,23 +69,44 @@ drpm_fit <- function(y,s_coords=NULL, M=1, centering_partition=NULL,
 	update_alpha <- ifelse(alpha_0==TRUE, 0, 1)
 	update_eta1 <- ifelse(eta1_0==TRUE, 0, 1)
 	update_phi1 <- ifelse(phi1_0==TRUE, 0, 1)
-	C.out <- .C("drpm_ar1_sppm",
-      as.integer(draws), as.integer(burn),as.integer(thin),
-      as.integer(nsubject),as.integer(ntime),
-      as.double(t(y)), as.double(s1), as.double(s2),
-      as.double(M), as.integer(centering_partition), as.double(alpha),
-      as.double(modelPriors),as.integer(global_alpha),
-      as.integer(update_alpha), as.integer(update_eta1), as.integer(update_phi1),
-      as.integer(sPPM), as.integer(SpatialCohesion), as.double(cParms),
-      as.double(mh), as.integer(space_1),
-      Si.draws = as.integer(Si),mu.draws = as.double(mu),
-      sig2.draws = as.double(sig2), eta1.draws = as.double(eta1),
-      theta.draws = as.double(theta), tau2.draws = as.double(tau2),
-      phi0.draws = as.double(phi0), phi1.draws = as.double(phi1),
-      lam2.draws = as.double(lam2), gamma.draws=as.integer(gamma),
-      alpha.draws = as.double(alpha_out),fitted.draws = as.double(fitted),
-      llike.draws=as.double(llike),lpml.out = as.double(lpml),
-      waic.out = as.double(waic))
+	if(is.null(centering_partition)){
+	  C.out <- .C("drpm_ar1_sppm",
+        as.integer(draws), as.integer(burn),as.integer(thin),
+        as.integer(nsubject),as.integer(ntime),
+        as.double(t(y)), as.double(s1), as.double(s2),
+        as.double(M), as.integer(centering_partition), as.double(alpha),
+        as.double(modelPriors),as.double(t(alphaPriors)),as.integer(global_alpha),
+        as.integer(update_alpha), as.integer(update_eta1), as.integer(update_phi1),
+        as.integer(sPPM), as.integer(SpatialCohesion), as.double(cParms),
+        as.double(mh), as.integer(space_1),
+        Si.draws = as.integer(Si),mu.draws = as.double(mu),
+        sig2.draws = as.double(sig2), eta1.draws = as.double(eta1),
+        theta.draws = as.double(theta), tau2.draws = as.double(tau2),
+        phi0.draws = as.double(phi0), phi1.draws = as.double(phi1),
+        lam2.draws = as.double(lam2), gamma.draws=as.integer(gamma),
+        alpha.draws = as.double(alpha_out),fitted.draws = as.double(fitted),
+        llike.draws=as.double(llike),lpml.out = as.double(lpml),
+        waic.out = as.double(waic))
+	}
+	if(!is.null(centering_partition)){
+	  C.out <- .C("informed_ar1_sppm",
+	              as.integer(draws), as.integer(burn),as.integer(thin),
+	              as.integer(nsubject),as.integer(ntime),
+	              as.double(t(y)), as.double(s1), as.double(s2),
+	              as.double(M), as.integer(centering_partition), as.double(alpha),
+	              as.double(modelPriors),as.double(t(alphaPriors)),as.integer(global_alpha),
+	              as.integer(update_alpha), as.integer(update_eta1), as.integer(update_phi1),
+	              as.integer(sPPM), as.integer(SpatialCohesion), as.double(cParms),
+	              as.double(mh), as.integer(space_1),
+	              Si.draws = as.integer(Si),mu.draws = as.double(mu),
+	              sig2.draws = as.double(sig2), eta1.draws = as.double(eta1),
+	              theta.draws = as.double(theta), tau2.draws = as.double(tau2),
+	              phi0.draws = as.double(phi0), phi1.draws = as.double(phi1),
+	              lam2.draws = as.double(lam2), gamma.draws=as.integer(gamma),
+	              alpha.draws = as.double(alpha_out),fitted.draws = as.double(fitted),
+	              llike.draws=as.double(llike),lpml.out = as.double(lpml),
+	              waic.out = as.double(waic))
+	}
 #}
 
 	out <- NULL
@@ -96,7 +118,6 @@ drpm_fit <- function(y,s_coords=NULL, M=1, centering_partition=NULL,
   out$theta <- matrix(C.out$theta.draws, nrow=nout, byrow=TRUE)
   out$tau2 <- matrix(C.out$tau2.draws,nrow=nout, byrow=TRUE)
   out$alpha <- matrix(C.out$alpha.draws,nrow=nout, byrow=TRUE)
-	if(global_alpha) out$alpha <- out$alpha[,2]
 
   out$eta1 <- matrix(C.out$eta1.draws,nrow=nout, byrow=TRUE)
 
