@@ -37,7 +37,7 @@
 * alpha = double - prior probability of being pegged, starting value only if update_alpha is TRUE
 * priorvals = vector containing values for prior distributions as follows
 *
-* global_alpha = integer - logical indicating wether to make alpha time-specific or one global alpha.
+* time_specific_alpha = integer - logical indicating wether to make alpha time-specific or one global alpha.
 * update_alpha = integer - logical indicating wether to update alpha or not.
 * update_eta1 = integer - logical indicating whether to update eta1 or set it to zero for all subjects.
 * update_phi1 = integer - logical indicating whether to update phi1 or set it to zero.
@@ -68,8 +68,9 @@
 
 void drpm_ar1_sppm(int *draws, int *burn, int *thin, int *nsubject, int *ntime,
 			  double *y, double *s1, double *s2, double *M, 
-			  double *alpha, double *modelPriors, 
-			  int *global_alpha, int *update_alpha, int *update_eta1, int *update_phi1, 
+			  double *alpha, double *modelPriors, double *alphaPriors,
+			  int *time_specific_alpha, 
+			  int *update_alpha, int *update_eta1, int *update_phi1, 
 			  int *sPPM, int *SpatialCohesion, double *cParms, double *mh,
 			  int *space_1,
 			  int *Si, double *mu, double *sig2, double *eta1, double *theta, double *tau2, 
@@ -280,10 +281,10 @@ void drpm_ar1_sppm(int *draws, int *burn, int *thin, int *nsubject, int *ntime,
 	double m0 = modelPriors[0], s20 = modelPriors[1]; 
 
 	// priors for alpha
-	double a = modelPriors[5], b = modelPriors[6];
+	double a = alphaPriors[0], b = alphaPriors[1];
 
 	//priors for eta1
-	double b_eta1 = modelPriors[7];
+	double b_eta1 = modelPriors[5];
 
 //	Rprintf("b_eta1 = %f\n", b_eta1);
 		
@@ -465,6 +466,8 @@ void drpm_ar1_sppm(int *draws, int *burn, int *thin, int *nsubject, int *ntime,
 					for(k = 0; k < nclus_red; k++){
 //						Rprintf("k = %d\n", k);
 						if(*sPPM==1){
+						    // Note that if space is only included for first time point
+						    // then it does not inform gamma.
 							if((*space_1==1 & t == 0) | (*space_1==0)){
 								indx = 0;
 								for(jj = 0; jj < n_red; jj++){
@@ -1603,7 +1606,7 @@ void drpm_ar1_sppm(int *draws, int *burn, int *thin, int *nsubject, int *ntime,
 		//																			//
 		//////////////////////////////////////////////////////////////////////////////
 		if(*update_alpha == 1){
-			if(*global_alpha == 1){
+			if(*time_specific_alpha == 1){
 				sumg = 0;
 				for(j = 0; j < *nsubject; j++){
 					for(t = 1; t < *ntime; t++){
@@ -1819,7 +1822,7 @@ void drpm_ar1_sppm(int *draws, int *burn, int *thin, int *nsubject, int *ntime,
 
 
 			if(*update_alpha == 1){
-				if(*global_alpha == 1){
+				if(*time_specific_alpha == 1){
 					
 					
 					n_red = 0;

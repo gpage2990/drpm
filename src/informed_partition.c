@@ -37,7 +37,7 @@
 * alpha = double - prior probability of being pegged, starting value only if update_alpha is TRUE
 * priorvals = vector containing values for prior distributions as follows
 *
-* global_alpha = integer - logical indicating wether to make alpha time-specific or one global alpha.
+* time_specific_alpha = integer - logical indicating wether to make alpha time-specific or constant over time.
 * update_alpha = integer - logical indicating wether to update alpha or not.
 * update_eta1 = integer - logical indicating whether to update eta1 or set it to zero for all subjects.
 * update_phi1 = integer - logical indicating whether to update phi1 or set it to zero.
@@ -66,10 +66,13 @@
 *****************************************************************************************/
 
 
-void informed_ar1_sppm(int *draws, int *burn, int *thin, int *nsubject, int *ntime,
-			  double *y, double *s1, double *s2, double *M, int *centering_partition,
-			  double *alpha, double *modelPriors, double *alphaPriors,
-			  int *global_alpha, int *update_alpha, int *update_eta1, int *update_phi1, 
+void informed_ar1_sppm(int *draws, int *burn, int *thin, 
+              int *nsubject, int *ntime,
+			  double *y, double *s1, double *s2, 
+			  double *M, int *centering_partition, double *alpha, 
+			  double *modelPriors, double *alphaPriors,
+			  int *time_specific_alpha, int *unit_specific_alpha,
+			  int *update_alpha, int *update_eta1, int *update_phi1, 
 			  int *sPPM, int *SpatialCohesion, double *cParms, double *mh,
 			  int *space_1,
 			  int *Si, double *mu, double *sig2, double *eta1, double *theta, double *tau2, 
@@ -124,16 +127,15 @@ void informed_ar1_sppm(int *draws, int *burn, int *thin, int *nsubject, int *nti
   int Si_iter[(*nsubject)*(ntime1)];
   int nclus_iter[ntime1]; 
 
-  double *eta1_iter = R_VectorInit(*nsubject, runif(0,1));
+  double *eta1_iter = R_VectorInit(*nsubject, 0);
   double *theta_iter = R_VectorInit(ntime1, rnorm(0,3));
   double *tau2_iter = R_VectorInit(ntime1, runif(0, modelPriors[3]*modelPriors[3]));
 
   double phi0_iter = rnorm(0,3);
-  double phi1_iter = runif(0,1);
+  double phi1_iter = runif(0,1); if(update_eta1==0) phi1_iter = 0;
   double lam2_iter = runif(0, modelPriors[4]*modelPriors[4]);
 
-  double *alpha_iter = R_VectorInit(ntime1, *alpha);	
-	
+  double *alpha_iter = R_VectorInit((*nsubject)*(ntime1), *alpha);	
   // ===================================================================================
   // 
   // Memory vectors to hold MCMC iterates for cluster specific parameters
@@ -158,6 +160,7 @@ void informed_ar1_sppm(int *draws, int *burn, int *thin, int *nsubject, int *nti
   // scratch memory (never filled in) so that
   // I can avoid dealing with boundaries in algorithm
   for(j = 0; j < *nsubject; j++){ 
+    alpha_iter[j*(ntime1) + 0]=1.0;
     for(t = 0; t < ntime1; t++){ // Note I am not initializing the "added time memory"
 	  Si_iter[j*(ntime1) + t] = 1;
 	  gamma_iter[j*(ntime1) + t] = 0;
@@ -167,12 +170,11 @@ void informed_ar1_sppm(int *draws, int *burn, int *thin, int *nsubject, int *nti
     }
   }
   // Here we put in the first slot the centering partition
-  // if there is one supplied.  This will then be the first
-  // entry of all subsequent MCMC iterates and stored as well.
-  if(cp != 0){
-    for(j=0; j<*nsubject; j++){
-      Si_iter[j*(ntime1) + 0] = centering_partition[j];
-    }
+  // This will then be the first entry of all subsequent MCMC 
+  // iterates and stored as well.
+  for(j=0; j<*nsubject; j++){
+    Si_iter[j*(ntime1) + 0] = centering_partition[j];
+    gamma_iter[j*(ntime1) + 0] = 1;
   }
 
   // Initial enumeration of number of subjects per cluster;
@@ -285,11 +287,9 @@ void informed_ar1_sppm(int *draws, int *burn, int *thin, int *nsubject, int *nti
   // priors for phi0
   double m0 = modelPriors[0], s20 = modelPriors[1]; 
 
-  // priors for alpha
-  double a = alphaPriors[0], b = alphaPriors[1];
 
   //priors for eta1
-  double b_eta1 = modelPriors[7];
+  double b_eta1 = modelPriors[5];
 
 //	Rprintf("b_eta1 = %f\n", b_eta1);
 		
@@ -325,12 +325,6 @@ void informed_ar1_sppm(int *draws, int *burn, int *thin, int *nsubject, int *nti
 //	Rprintf("csigETA1 = %f\n", csigETA1);
 
 
-  // If there is no centering partition, then proceed as normal
-  // so we set ts = 0.  If there is a centering partition, then
-  // I want to start updating at time point 1 since time point
-  // 0 contains the centered partition and gamma_t = 1 at t=0;
-  ts=0;
-  if(cp!=0) ts=1;
 
   GetRNGstate();
 
@@ -357,17 +351,12 @@ void informed_ar1_sppm(int *draws, int *burn, int *thin, int *nsubject, int *nti
 //	Rprintf("*ntime = %d\n", *ntime);
 
 	// Start updating gamma and partition for each time period
-	for(t = 0; t < *ntime; t++){
+	// Note that I start at one here as I don't want to update
+	// anything at t=0 as that is the slot for the centered 
+	// partition.
+	for(t = 1; t < *ntime; t++){
 			
 //	  Rprintf("t = %d\n", t);
-
-			
-//	  RprintIVecAsMat("nh", nh, *nsubject, ntime1);
-//	  RprintIVecAsMat("Si", Si_iter, *nsubject, ntime1);
-//	  RprintIVecAsMat("gamma", gamma_iter, *nsubject, ntime1);
-//	  Rprintf("nclus_iter[t] = %d\n", nclus_iter[t]);
-
-
 
 	  //////////////////////////////////////////////////////////////////////////////
 	  // 
@@ -375,270 +364,221 @@ void informed_ar1_sppm(int *draws, int *burn, int *thin, int *nsubject, int *nti
 	  //
 	  //////////////////////////////////////////////////////////////////////////////
 
-
-	  for(j = 0; j < *nsubject; j++){
+      for(j = 0; j < *nsubject; j++){
 //	    Rprintf("t = %d\n", t);
 //	    Rprintf("j ====================================== %d\n", j);
 
+        //////////////////////////////////////////////////////////////////////
+        // find the reduced partition information 
+        // i.e., vector of cluster labels;
+        //////////////////////////////////////////////////////////////////////
+                
+        Rindx1 = 0;
+        for(jj = 0; jj < *nsubject; jj++){
+          if(gamma_iter[jj*ntime1 + (t)] == 1){
+            if(jj != j){
+              Si_tmp[Rindx1] = Si_iter[jj*ntime1 + (t)];
+        	    Si_tmp2[Rindx1] = Si_iter[jj*ntime1 + (t)];
+        	    comptm1[Rindx1] = Si_iter[jj*ntime1 + (t-1)]; // for t=1, this references cp
+        
+        	    // Also get the reduced spatial coordinates if
+        	    // space is included
+        	    if(*sPPM==1){
+        	      if((*space_1==1 & t == 1) | (*space_1==0)){
+        	        s1_red[Rindx1] = s1[jj];
+        		    s2_red[Rindx1] = s2[jj];
+        	      }
+        	    }
+        	    Rindx1 = Rindx1 + 1;
+            }
+          }
+        }	
+        Si_tmp2[Rindx1] = Si_iter[j*ntime1 + (t)];
+        comptm1[Rindx1] = Si_iter[j*ntime1 + (t-1)];
+        
+        n_red = Rindx1;
+        n_red_1 = Rindx1 + 1;
+        
+        
+        relabel(Si_tmp, *nsubject, Si_red, reorder, oldLab);			
+        relabel(Si_tmp2, *nsubject, Si_red_1, reorder, oldLab);			
+        
+        
+        // I need to keep the relabeled cluster label for the pegged
+        // individual so that I know what lgweight to keep in the 
+        // full conditional.
+        cit_1 = Si_red_1[Rindx1];
+        			
+        			
+        
+        for(jj = 0; jj < n_red_1; jj++){
+          nh_red[jj]=0; nh_red_1[jj]=0;			
+        }
+        
+        nclus_red = 0;
+        for(jj = 0; jj < n_red; jj++){
+          nh_red[Si_red[jj]-1] = nh_red[Si_red[jj]-1] + 1; 
+          nh_red_1[Si_red_1[jj]-1] = nh_red_1[Si_red_1[jj]-1] + 1; 
+        
+          if(Si_red[jj] > nclus_red) nclus_red = Si_red[jj];
+        }
+        			
+        nh_red_1[Si_red_1[n_red]-1]= nh_red_1[Si_red_1[n_red]-1] + 1;			
+        // this may need to be updated depending on if the value of gamma changes
+        
+        nclus_red_1 = nclus_red;
+        
+        if(Si_red_1[n_red] > nclus_red) nclus_red_1 = Si_red_1[n_red]; 
+        
+        
+        
+        lCo=0.0, lCn=0.0;
+        for(k = 0; k < nclus_red; k++){
 
+          if(*sPPM==1){
+            if((*space_1==1 & t == 1) | (*space_1==0)){
+              indx = 0;
+          	  for(jj = 0; jj < n_red; jj++){
+          	    if(Si_red[jj] == k+1){							
+          	      s1o[indx] = s1_red[jj];
+          		  s2o[indx] = s2_red[jj];
+          
+          		  s1n[indx] = s1_red[jj];
+          		  s2n[indx] = s2_red[jj];
+          
+          		  indx = indx+1;
+          	    }
+          	  }
+          	  s1n[indx] = s1[j];
+          	  s2n[indx] = s2[j];
+          
+          					
+          	  lCo = Cohesion3_4(s1o, s2o, mu0, k0, v0, L0, nh_red[k], *SpatialCohesion, 1);
+          	  lCn = Cohesion3_4(s1n, s2n, mu0, k0, v0, L0, nh_red[k]+1,*SpatialCohesion, 1);
+            }
+          }
 
-		// at time period one, all gammas are zero (none are ``pegged'')
-		if(t == 0){
-		  gamma_iter[j*(ntime1) + t] = 0;
-		  
-		  // This next line is crucial for the case when 
-		  // there is a centering partition supplied.  Here we
-		  // set the gamma_1 = 1, so that the centering partition
-		  // doesn't change. 
-		  if(cp != 0) gamma_iter[j*(ntime1) + t] = 1;
-        } else {
-
-
-		  //////////////////////////////////////////////////////////////////////
-		  // find the reduced partition information 
-		  // i.e., vector of cluster labels;
-		  //////////////////////////////////////////////////////////////////////
-
-		  Rindx1 = 0;
-		  for(jj = 0; jj < *nsubject; jj++){
-		    if(gamma_iter[jj*ntime1 + (t)] == 1){
-		      if(jj != j){
-		        Si_tmp[Rindx1] = Si_iter[jj*ntime1 + (t)];
-			    Si_tmp2[Rindx1] = Si_iter[jj*ntime1 + (t)];
-			    comptm1[Rindx1] = Si_iter[jj*ntime1 + (t-1)];
-
-			    // Also get the reduced spatial coordinates if
-			    // space is included
-			    if(*sPPM==1){
-			      if((*space_1==1 & t == 0) | (*space_1==0)){
-			        s1_red[Rindx1] = s1[jj];
-				    s2_red[Rindx1] = s2[jj];
-			      }
-			    }
-			    Rindx1 = Rindx1 + 1;
-		      }
-		    }
-		  }	
-		  Si_tmp2[Rindx1] = Si_iter[j*ntime1 + (t)];
-		  comptm1[Rindx1] = Si_iter[j*ntime1 + (t-1)];
-
-		  n_red = Rindx1;
-		  n_red_1 = Rindx1 + 1;
-
-
-		  relabel(Si_tmp, *nsubject, Si_red, reorder, oldLab);			
-		  relabel(Si_tmp2, *nsubject, Si_red_1, reorder, oldLab);			
-
-
-		  // I need to keep the relabeled cluster label for the pegged
-		  // individual so that I know what lgweight to keep in the 
-		  // full conditional.
-		  cit_1 = Si_red_1[Rindx1];
-					
-					
-
-	 	  for(jj = 0; jj < n_red_1; jj++){
-		    nh_red[jj]=0; nh_red_1[jj]=0;			
-		  }
-
-		  nclus_red = 0;
-		  for(jj = 0; jj < n_red; jj++){
-		    nh_red[Si_red[jj]-1] = nh_red[Si_red[jj]-1] + 1; 
-		    nh_red_1[Si_red_1[jj]-1] = nh_red_1[Si_red_1[jj]-1] + 1; 
-
-		    if(Si_red[jj] > nclus_red) nclus_red = Si_red[jj];
-		  }
-					
-		  nh_red_1[Si_red_1[n_red]-1]= nh_red_1[Si_red_1[n_red]-1] + 1;			
-		  // this may need to be updated depending on if the value of gamma changes
-
-		  nclus_red_1 = nclus_red;
-
-		  if(Si_red_1[n_red] > nclus_red) nclus_red_1 = Si_red_1[n_red]; 
-
-
-
-		  lCo=0.0, lCn=0.0;
-		  for(k = 0; k < nclus_red; k++){
-//		    Rprintf("k = %d\n", k);
-			if(*sPPM==1){
-			  if((*space_1==1 & t == ts) | (*space_1==0)){
-			    indx = 0;
-				for(jj = 0; jj < n_red; jj++){
-				  if(Si_red[jj] == k+1){							
-				    s1o[indx] = s1_red[jj];
-					s2o[indx] = s2_red[jj];
-	
-					s1n[indx] = s1_red[jj];
-					s2n[indx] = s2_red[jj];
-
-					indx = indx+1;
- 				  }
-				}
-				s1n[indx] = s1[j];
-				s2n[indx] = s2[j];
-
-								
-				lCo = Cohesion3_4(s1o, s2o, mu0, k0, v0, L0, nh_red[k], *SpatialCohesion, 1);
-				lCn = Cohesion3_4(s1n, s2n, mu0, k0, v0, L0, nh_red[k]+1,*SpatialCohesion, 1);
-			  }
-			}
-//			Rprintf("lCo = %f\n", lCo);
-//			Rprintf("lCn = %f\n", lCn);
-
-//			Rprintf("nh_red[k] = %d\n", nh_red[k]);
-						
-			lgweight[k] = log(nh_red[k]) + lCn - lCo;
-//			Rprintf("lgweight = %f\n", lgweight[k]);
-
-			Si_red_1[Rindx1] = k+1;
-
-//			RprintIVecAsMat("comptm1",comptm1, 1, Rindx1+1);
-//			RprintIVecAsMat("Si_red_1",Si_red_1, 1, Rindx1+1);
-
-			rho_comp = compatibility(Si_red_1, comptm1, Rindx1+1);
-
-//			Rprintf("rho_comp = %d\n", rho_comp);
-
-//			if(rho_comp==0) lgweight[k] = log(0);
-
-//			Rprintf("lgweight = %f\n", lgweight[k]);
-		  }
-						
-					
-//		  RprintVecAsMat("lgweight", lgweight, 1, nclus_red);
-
-		  // What if pegged subject creates a singleton in the reduced partition?
-		  lCn_1=0.0;
-		  if(*sPPM==1){
-		    if((*space_1==1 & t == ts) | (*space_1==0)){
-			  s1o[0] = s1[j]; 
-			  s2o[0] = s2[j]; 
-			  lCn_1 = Cohesion3_4(s1o, s2o, mu0, k0, v0, L0, 1,*SpatialCohesion, 1);
-			}
-		  }
-
-//		  Rprintf("lCn_1 = %f\n", lCn_1);
-
-//		  Rprintf("k = %d\n", k+1)
-		  lgweight[nclus_red] = log(Mdp) +  lCn_1;
-					
-		  Si_red_1[Rindx1] = nclus_red+1;
-
-//		  RprintIVecAsMat("comptm1",comptm1, 1, Rindx1+1);
-//		  RprintIVecAsMat("Si_red_1",Si_red_1, 1, Rindx1+1);
-
-		  rho_comp = compatibility(Si_red_1, comptm1, Rindx1+1);
-
-// 		  if(rho_comp == 0) lgweight[nclus_red] = log(0);
-					
-//		  RprintVecAsMat("lgweight", lgweight, 1, nclus_red + 1);
-							
-		  denph = 0.0;
-		  for(k = 0; k < nclus_red + 1; k++){
-		    phtmp[k] = lgweight[k] ;
-		  }
-//		  RprintVecAsMat("phtmp", phtmp, 1, nclus_red + 1);
-
-	
-		  R_rsort(phtmp,  nclus_red + 1) ;
-	
-//		  RprintVecAsMat("phtmp ", phtmp, 1, nclus_red + 1);
-						
-//		  Rprintf("nclus_red_1 = %d\n", nclus_red_1);	
-		  maxph = phtmp[nclus_red];
-//		  Rprintf("maxph = %f\n", maxph);
-
-		  denph = 0.0;
-		  for(k = 0; k < nclus_red + 1; k++){
-							
-		    lgweight[k] = exp(lgweight[k] - maxph);
-		    denph = denph + lgweight[k];
-		  }
-//		  RprintVecAsMat("lgweight ", lgweight, 1, nclus_red + 1);
-//		  Rprintf("denph = %f\n", denph);
-					
-		  for(k = 0; k < nclus_red + 1; k++){
-		    lgweight[k] = lgweight[k]/denph;
-		  }
-//		  RprintVecAsMat("lgweight", lgweight, 1, nclus_red + 1);
+          lgweight[k] = log(nh_red[k]) + lCn - lCo;
+          
+          Si_red_1[Rindx1] = k+1;
+          
+          rho_comp = compatibility(Si_red_1, comptm1, Rindx1+1);
+          
+          if(rho_comp==0) lgweight[k] = log(0);
+          
+        }
 				
-//		  RprintIVecAsMat("nh_red_no_zero", nh_red_no_zero, 1, *nsubject);
-
-
-
-		  probh[1] = alpha_iter[t]/(alpha_iter[t] + (1-alpha_iter[t])*lgweight[cit_1-1]);
-
-//		  Rprintf("probh[1] = %f\n", probh[1]);
-
-
-		  // If gamma is 1 at current MCMC iterate, then there are no 
-		  // concerns about partitions being incompatible as gamma changes 
-		  // from 1 to 0.
-		  //
-		  // However, if gamma's current value is 0, then care must be taken when
-		  // trying to change from gamma=0 to gamma=1 as the partitions may
-		  // no longer be compatible
-
-//		  RprintIVecAsMat("nh_red", nh_red, 1, *nsubject);
-//		  Rprintf("gamma_iter[j*(ntime1) + t] = %d\n", gamma_iter[j*(ntime1) + t]);
-		  if(gamma_iter[j*(ntime1) + t] == 0){
-						
-		    // To determine compatibility, I need to make sure that 
-			// comparison of the reduced partitios is being made with 
-			// correct cluster labeling.  I try to do this by identifying 
-			// the sets of units and sequentially assigning "cluster labels" 
-			// starting with set that contains the first unit. I wonder if 
-			// there is a way to do this in C with out using loops?  Who
-			// can I ask about this?
-
-			// Get rho_t | gamma_t = 1 and rho_{t-1} | gamma_t = 1
-			// when gamma_{it} = 1;
-			Rindx1 = 0;
-			for(jj = 0; jj < *nsubject; jj++){
-		      if(gamma_iter[jj*ntime1 + (t)] == 1){
-			    comptm1[Rindx1] = Si_iter[jj*ntime1 + (t-1)];
-				comp1t[Rindx1] = Si_iter[jj*ntime1 + (t)];
-				Rindx1 = Rindx1 + 1;
-			  }
-			  // I need to include this because determine what happens when 
-			  // gamma goes from 0 to 1;
-			  if(jj == j){ 
-			    comptm1[Rindx1] = Si_iter[jj*ntime1 + (t-1)];
-				comp1t[Rindx1] = Si_iter[jj*ntime1 + (t)];
-				Rindx1 = Rindx1 + 1;
-			  }							
-			}
-
-//			Rprintf("Rindx1 = %d\n", Rindx1);
-//			RprintIVecAsMat("comptm1", comptm1, 1, *nsubject);
-//			RprintIVecAsMat("comp1t", comp1t, 1, *nsubject);
-
-			rho_comp = compatibility(comptm1, comp1t, Rindx1);
-
-//			Rprintf("rho_comp = %d\n", rho_comp);
-
-			// If rho_comp = 0 then not compatible and probability of
-			// pegging subject needs to be set to 0;
-			if(rho_comp==0){
-			  probh[1] = 0;
-			}
-	
-		  }
-
-
-
-//		  Rprintf("probh[1] = %f\n", probh[1]);
-										
-		  gt = rbinom(1,probh[1]);
-					
-//		  Rprintf("gt = %d\n", gt);
-		  gamma_iter[j*(ntime1) + t] = gt;
-
+        // What if pegged subject creates a singleton in the reduced partition?
+        lCn_1=0.0;
+          if(*sPPM==1){
+            if((*space_1==1 & t == 1) | (*space_1==0)){
+            s1o[0] = s1[j]; 
+            s2o[0] = s2[j]; 
+            lCn_1 = Cohesion3_4(s1o, s2o, mu0, k0, v0, L0, 1,*SpatialCohesion, 1);
+          }
         }
 
-	  }
 
+        lgweight[nclus_red] = log(Mdp) +  lCn_1;
+        		
+        Si_red_1[Rindx1] = nclus_red+1;
+                
+        rho_comp = compatibility(Si_red_1, comptm1, Rindx1+1);
+        
+        if(rho_comp == 0) lgweight[nclus_red] = log(0);
+        		
+        				
+        denph = 0.0;
+        for(k = 0; k < nclus_red + 1; k++){
+          phtmp[k] = lgweight[k] ;
+        }
+        
+        
+        R_rsort(phtmp,  nclus_red + 1) ;
+        
+        maxph = phtmp[nclus_red];
+        
+        denph = 0.0;
+        for(k = 0; k < nclus_red + 1; k++){
+          lgweight[k] = exp(lgweight[k] - maxph);
+          denph = denph + lgweight[k];
+        }
+		
+        for(k = 0; k < nclus_red + 1; k++){
+          lgweight[k] = lgweight[k]/denph;
+        }
+
+        // Note that if time_specific_alpha is false, then 
+        // alpha[t] is the same for all value of t
+        if(*unit_specific_alpha==1){
+          probh[1] = alpha_iter[j*(ntime1) + t]/
+                     (alpha_iter[j*(ntime1) + t] + (1-alpha_iter[j*(ntime1) + t])*lgweight[cit_1-1]);
+        } else {
+          probh[1] = alpha_iter[t]/(alpha_iter[t] + (1-alpha_iter[t])*lgweight[cit_1-1]);
+        }
+
+        // Rprintf("probh[1] = %f\n", probh[1]);
+
+
+        // If gamma is 1 at current MCMC iterate, then there are no 
+        // concerns about partitions being incompatible as gamma changes 
+        // from 1 to 0.
+        //
+        // However, if gamma's current value is 0, then care must be taken when
+        // trying to change from gamma=0 to gamma=1 as the partitions may
+        // no longer be compatible
+
+//        RprintIVecAsMat("nh_red", nh_red, 1, *nsubject);
+//        Rprintf("gamma_iter[j*(ntime1) + t] = %d\n", gamma_iter[j*(ntime1) + t]);
+
+        if(gamma_iter[j*(ntime1) + t] == 0){
+			
+          // To determine compatibility, I need to make sure that 
+          // comparison of the reduced partitios is being made with 
+          // correct cluster labeling.  I try to do this by identifying 
+          // the sets of units and sequentially assigning "cluster labels" 
+          // starting with set that contains the first unit. I wonder if 
+          // there is a way to do this in C with out using loops?  Who
+          // can I ask about this?
+
+          // Get rho_t | gamma_t = 1 and rho_{t-1} | gamma_t = 1
+          // when gamma_{it} = 1;
+          Rindx1 = 0;
+          for(jj = 0; jj < *nsubject; jj++){
+            if(gamma_iter[jj*ntime1 + (t)] == 1){
+              comptm1[Rindx1] = Si_iter[jj*ntime1 + (t-1)];
+          	  comp1t[Rindx1] = Si_iter[jj*ntime1 + (t)];
+          	  Rindx1 = Rindx1 + 1;
+            }
+            // I need to include this because determine what happens when 
+            // gamma goes from 0 to 1;
+            if(jj == j){ 
+              comptm1[Rindx1] = Si_iter[jj*ntime1 + (t-1)];
+          	  comp1t[Rindx1] = Si_iter[jj*ntime1 + (t)];
+          	  Rindx1 = Rindx1 + 1;
+            }							
+          }
+          
+          rho_comp = compatibility(comptm1, comp1t, Rindx1);
+          
+//          Rprintf("rho_comp = %d\n", rho_comp);
+          
+          // If rho_comp = 0 then not compatible and probability of
+          // pegging subject needs to be set to 0;
+          if(rho_comp==0){
+            probh[1] = 0;
+          }
+        }
+
+//        Rprintf("probh[1] = %f\n", probh[1]);
+							
+        gt = rbinom(1,probh[1]);
+		
+//        Rprintf("gt = %d\n", gt);
+        gamma_iter[j*(ntime1) + t] = gt;
+
+      }
+//    RprintIVecAsMat("gamma", gamma_iter, *nsubject, ntime1);
 
 
 //	  Rprintf("Begin updating partition for time %d\n", t+1);
@@ -681,8 +621,9 @@ void informed_ar1_sppm(int *draws, int *burn, int *thin, int *nsubject, int *nti
 
 		// Only need to update partition relative to units that are not pegged
 		//
-		// Note that if a centering partition is supplied then gamma = 1 and the
-		// first entry of Si_iter is never updated. 
+		// Note that if a centering partition is supplied then gamma = 1 for all units and the
+		// first entry of Si_iter is never updated and so this part of codes is never executed
+		// for t=0 when rho0 is supplied. 
         if(gamma_iter[j*(ntime1) + t] == 0){
 
 		  if(nh[(Si_iter[j*(ntime1) + t]-1)*(ntime1) + t] > 1){
@@ -802,7 +743,7 @@ void informed_ar1_sppm(int *draws, int *burn, int *thin, int *nsubject, int *nti
 		        // Beginning of spatial part
 		        lCn = 0.0;
 		        if(*sPPM==1){
-			      if((*space_1==1 & t == ts) | (*space_1==0)){
+			      if((*space_1==1 & t == 1) | (*space_1==0)){
 			        indx = 0;
 				    for(jj = 0; jj < *nsubject; jj++){
 				      if(rho_tmp[jj] == kk+1){					
@@ -831,7 +772,7 @@ void informed_ar1_sppm(int *draws, int *burn, int *thin, int *nsubject, int *nti
 		      }
 
 
-		      if(t==ts){
+		      if(t==1){// t=1 is first time point after centering partition
 
                 ph[k] = dnorm(y[j*(*ntime) + t], 
 							  muh[k*(ntime1) + t], 
@@ -840,7 +781,7 @@ void informed_ar1_sppm(int *draws, int *burn, int *thin, int *nsubject, int *nti
            
 
 		      }
-              if(t > ts){
+              if(t > 1){// Do I want there to be temporal correlation between rho0 and rho1?
 
                 ph[k] = dnorm(y[j*(*ntime) + t], 
 							  muh[k*(ntime1) + t] + eta1_iter[j]*y[j*(*ntime) + t-1], 
@@ -949,7 +890,7 @@ void informed_ar1_sppm(int *draws, int *burn, int *thin, int *nsubject, int *nti
 		      // Beginning of spatial part
 		      lCn = 0.0;
 		      if(*sPPM==1){
-		        if((*space_1==1 & t == ts) | (*space_1==0)){
+		        if((*space_1==1 & t == 1) | (*space_1==0)){
 		          indx = 0;
 		          for(jj = 0; jj < *nsubject; jj++){
 				
@@ -989,12 +930,12 @@ void informed_ar1_sppm(int *draws, int *burn, int *thin, int *nsubject, int *nti
 //          Rprintf("lCn = %f\n", lCn);
 //	        Rprintf("lpp = %f\n", lpp);
 						
-	        if(t==ts){
+	        if(t==1){
 	          ph[nclus_iter[t]] = dnorm(y[j*(*ntime) + t], mudraw, sigdraw, 1) + 
 		                          lpp;
 	        }
 
-	        if(t > ts){
+	        if(t > 1){
 	          ph[nclus_iter[t]] = dnorm(y[j*(*ntime) + t], 
                                    mudraw + eta1_iter[j]*y[j*(*ntime) + t-1], 
 							       sigdraw*sqrt(1-eta1_iter[j]*eta1_iter[j]), 1) + 
@@ -1121,7 +1062,7 @@ void informed_ar1_sppm(int *draws, int *burn, int *thin, int *nsubject, int *nti
 
 
 
-	  for(j = 0; j < *nsubject; j++){
+      for(j = 0; j < *nsubject; j++){
 	    Si_tmp[j] = Si_iter[j*(ntime1) + t];
 	    Si_tmp2[j] = 0;
 		reorder[j] = 0;
@@ -1159,120 +1100,114 @@ void informed_ar1_sppm(int *draws, int *burn, int *thin, int *nsubject, int *nti
 
 
 
-	  if(t >= ts){
-        for(k = 0; k < nclus_iter[t]; k++){
+      for(k = 0; k < nclus_iter[t]; k++){
 
-
-//		Rprintf("sumy = %f\n", sumy);
-//		Rprintf("nh[k*(ntime1)+t] = %d\n",  nh[k*(ntime1)+t]);
-//		Rprintf("sig2h[k*(ntime1) + t] = %f\n",  sig2h[k*(ntime1) + t]);
-//		Rprintf("tau2_iter[t] = %f\n",  tau2_iter[t]);
-//		Rprintf("theta_iter[t] = %f\n",  theta_iter[t]);
+//	    Rprintf("sumy = %f\n", sumy);
+//	    Rprintf("nh[k*(ntime1)+t] = %d\n",  nh[k*(ntime1)+t]);
+//	    Rprintf("sig2h[k*(ntime1) + t] = %f\n",  sig2h[k*(ntime1) + t]);
+//	    Rprintf("tau2_iter[t] = %f\n",  tau2_iter[t]);
+//	    Rprintf("theta_iter[t] = %f\n",  theta_iter[t]);
 	
-          /////////////////////////////////////////
-          //									   //
-          // udate muh  						   //
-          //									   //
-          /////////////////////////////////////////
-          if(t==ts){
-
-		    sumy = 0.0;
-		    for(j = 0; j < *nsubject; j++){
-		      if(Si_iter[j*(ntime1) + t] == k+1){	
-		        sumy = sumy + y[j*(*ntime)+t];
-			  }
-		
+        ///////////////////////////////////////////
+        //									     //
+        // update muh  						     //
+        //									     //
+        ///////////////////////////////////////////
+        if(t==1){
+          sumy = 0.0;
+		  for(j = 0; j < *nsubject; j++){
+		    if(Si_iter[j*(ntime1) + t] == k+1){	
+		      sumy = sumy + y[j*(*ntime)+t];
 		    }
-		    s2star = 1/((double) nh[k*(ntime1)+t]/sig2h[k*(ntime1) + t] + 1/tau2_iter[t]);
-		    mstar = s2star*( (1/sig2h[k*(ntime1) + t])*sumy + (1/tau2_iter[t])*theta_iter[t]);
-          }
-		  if(t > ts){
-
-	        sumy = 0.0;
-		    sume2 = 0.0;
-		    for(j = 0; j < *nsubject; j++){
-		      if(Si_iter[j*(ntime1) + t] == k+1){	
-			    sume2 = sume2 + 1.0/(1-eta1_iter[j]*eta1_iter[j]);
-			    sumy = sumy + (y[j*(*ntime)+t] - eta1_iter[j]*y[j*(*ntime)+t-1])/
-				              (1-eta1_iter[j]*eta1_iter[j]);
-			  }
-		    }
-
-		    s2star = 1/( (1.0/sig2h[k*(ntime1) + t])*sume2  + 1/tau2_iter[t]);
-		    mstar = s2star*( (1.0/sig2h[k*(ntime1) + t])*sumy + (1/tau2_iter[t])*theta_iter[t]);
-				
 		  }
-//		  Rprintf("sume2 = %f\n", sume2);
-//		  Rprintf("sumy = %f\n", sumy);
-//  	  Rprintf("mstar = %f\n", mstar);
-//		  Rprintf("sqrt(s2star) = %f\n", sqrt(s2star));
-		  muh[k*(ntime1) + t] = rnorm(mstar, sqrt(s2star));
+		  s2star = 1/((double) nh[k*(ntime1)+t]/sig2h[k*(ntime1) + t] + 1/tau2_iter[t]);
+		  mstar = s2star*( (1/sig2h[k*(ntime1) + t])*sumy + (1/tau2_iter[t])*theta_iter[t]);
+        }
+		if(t > 1){
 
-//		  RprintVecAsMat("muh", muh, *nsubject, ntime1);
-
-		  /////////////////////////////////////////
-		  //									   //
-		  // udate sig2h 						   //
-		  //									   //
-		  /////////////////////////////////////////
-
-		  osig = sqrt(sig2h[k*(ntime1) + t]);
-		  nsig = rnorm(osig,csigSIG);
-
-		  if(nsig > 0.0 & nsig < Asig){		
-				
-		    lln = 0.0;
-			llo = 0.0;	
-			if(t == ts){
-			  for(j = 0; j < *nsubject; j++){
-			    if(Si_iter[j*(ntime1) + t] == k+1){	
-				  llo = llo + dnorm(y[j*(*ntime)+t], muh[k*(ntime1) + t], osig,1);
-				  lln = lln + dnorm(y[j*(*ntime)+t], muh[k*(ntime1) + t], nsig,1);
-				}
-			  }
-			}
-			if(t > ts){
-		      for(j = 0; j < *nsubject; j++){
-			    if(Si_iter[j*(ntime1) + t] == k+1){	
-				  llo = llo + dnorm(y[j*(*ntime)+t], muh[k*(ntime1) + t] + 
-								     eta1_iter[j]*y[j*(*ntime) + t-1], 
-									 osig*sqrt(1-eta1_iter[j]*eta1_iter[j]),1);
-				  lln = lln + dnorm(y[j*(*ntime)+t], muh[k*(ntime1) + t] + 
-									 eta1_iter[j]*y[j*(*ntime) + t-1], 
-									 nsig*sqrt(1-eta1_iter[j]*eta1_iter[j]),1);
-				}
-			  }					
-			}
-							                           
-//			Rprintf("ms = %f\n", ms);
-//			Rprintf("osig = %f\n", osig);
-//			Rprintf("nsig = %f\n", nsig);
-			llo = llo + dunif(osig, 0.0, Asig, 1);
-			lln = lln + dunif(nsig, 0.0, Asig, 1);
-				
-				
-//			Rprintf("llo = %f\n", llo);
-//			Rprintf("lln = %f\n", lln);
-	
-		    llr = lln - llo;
-		    uu = runif(0,1);
-
-//			Rprintf("llr = %f\n", llr);
-//			Rprintf("log(uu) = %f\n", log(uu));
-					
-		    if(log(uu) < llr){
-		      sig2h[k*(ntime1) + t] = nsig*nsig;					
+	      sumy = 0.0;
+		  sume2 = 0.0;
+		  for(j = 0; j < *nsubject; j++){
+		    if(Si_iter[j*(ntime1) + t] == k+1){	
+			  sume2 = sume2 + 1.0/(1-eta1_iter[j]*eta1_iter[j]);
+			  sumy = sumy + (y[j*(*ntime)+t] - eta1_iter[j]*y[j*(*ntime)+t-1])/
+				              (1-eta1_iter[j]*eta1_iter[j]);
 		    }
+		  }
 
-//			sig2h[k*(ntime1) + t] = 1.0;
+		  s2star = 1/( (1.0/sig2h[k*(ntime1) + t])*sume2  + 1/tau2_iter[t]);
+		  mstar = s2star*( (1.0/sig2h[k*(ntime1) + t])*sumy + (1/tau2_iter[t])*theta_iter[t]);
+				
+		}
+//		Rprintf("sume2 = %f\n", sume2);
+//		Rprintf("sumy = %f\n", sumy);
+//  	Rprintf("mstar = %f\n", mstar);
+//		Rprintf("sqrt(s2star) = %f\n", sqrt(s2star));
+		muh[k*(ntime1) + t] = rnorm(mstar, sqrt(s2star));
 
-          }	
-        }  
+//		RprintVecAsMat("muh", muh, *nsubject, ntime1);
+
+		///////////////////////////////////////////
+		//									     //
+		// update sig2h 						 //
+		//									     //
+		///////////////////////////////////////////
+
+		osig = sqrt(sig2h[k*(ntime1) + t]);
+		nsig = rnorm(osig,csigSIG);
+
+		if(nsig > 0.0 & nsig < Asig){		
+				
+		  lln = 0.0;
+		  llo = 0.0;	
+          if(t == 1){
+            for(j = 0; j < *nsubject; j++){
+              if(Si_iter[j*(ntime1) + t] == k+1){	
+                llo = llo + dnorm(y[j*(*ntime)+t], muh[k*(ntime1) + t], osig,1);
+                lln = lln + dnorm(y[j*(*ntime)+t], muh[k*(ntime1) + t], nsig,1);
+              }
+            }
+          }
+          if(t > 1){
+            for(j = 0; j < *nsubject; j++){
+              if(Si_iter[j*(ntime1) + t] == k+1){	
+                llo = llo + dnorm(y[j*(*ntime)+t], muh[k*(ntime1) + t] + 
+                			     eta1_iter[j]*y[j*(*ntime) + t-1], 
+                				 osig*sqrt(1-eta1_iter[j]*eta1_iter[j]),1);
+                lln = lln + dnorm(y[j*(*ntime)+t], muh[k*(ntime1) + t] + 
+                				 eta1_iter[j]*y[j*(*ntime) + t-1], 
+                				 nsig*sqrt(1-eta1_iter[j]*eta1_iter[j]),1);
+              }
+            }					
+          }
+							                           
+//	      Rprintf("ms = %f\n", ms);
+//		  Rprintf("osig = %f\n", osig);
+//		  Rprintf("nsig = %f\n", nsig);
+		  llo = llo + dunif(osig, 0.0, Asig, 1);
+		  lln = lln + dunif(nsig, 0.0, Asig, 1);
+				
+//		  Rprintf("llo = %f\n", llo);
+//		  Rprintf("lln = %f\n", lln);
+	
+		  llr = lln - llo;
+		  uu = runif(0,1);
+
+//		  Rprintf("llr = %f\n", llr);
+//		  Rprintf("log(uu) = %f\n", log(uu));
+					
+		  if(log(uu) < llr){
+		    sig2h[k*(ntime1) + t] = nsig*nsig;					
+		  }
+
+//		  sig2h[k*(ntime1) + t] = 1.0;
+
+        }	
 
 		//////////////////////////////////////////////////////////////////////////////
-		//																		  //
-		// update theta (mean of mh)												  //
-		//																		  //
+		//																		    //
+		// update theta (mean of mh)												//
+		//																		    //
 		//////////////////////////////////////////////////////////////////////////////
 		summu = 0.0;
 		for(k = 0; k < nclus_iter[t]; k++){
@@ -1285,7 +1220,7 @@ void informed_ar1_sppm(int *draws, int *burn, int *thin, int *nsubject, int *nti
 	    phi1sq = phi1_iter*phi1_iter;
 	    lam2tmp = lam2_iter*(1.0 - phi1sq);
 			
-	    if(t==ts){
+	    if(t==1){
 //		  Rprintf("t = %d\n", t);
 
 		  s2star = 1.0/((double) nclus_iter[t]/tau2_iter[t] + 1.0/lam2_iter + phi1sq/lam2tmp);
@@ -1379,7 +1314,7 @@ void informed_ar1_sppm(int *draws, int *burn, int *thin, int *nsubject, int *nti
         if(e1n < 1 & e1n > -1){
 					
           llo=lln=0.0;
-          for(t=(ts+1); t<*ntime; t++){
+          for(t=2; t<*ntime; t++){// need to skip the first "Y" as it is a column of zeros to accomodate rho0
             llo = llo + dnorm(y[j*(*ntime)+t], 
                                   muh[(Si_iter[j*(ntime1) + t]-1)*(ntime1) + t] + e1o*y[j*(*ntime)+t-1],
                                   sqrt(sig2h[(Si_iter[j*(ntime1) + t]-1)*(ntime1) + t]*(1-e1o*e1o)), 1);
@@ -1412,52 +1347,65 @@ void informed_ar1_sppm(int *draws, int *burn, int *thin, int *nsubject, int *nti
     //																			//
     //////////////////////////////////////////////////////////////////////////////
     if(*update_alpha == 1){
-	  if(*global_alpha == 1){
+	  if(*time_specific_alpha == 0 & *unit_specific_alpha==0){
+
 	    sumg = 0;
-		for(j = 0; j < *nsubject; j++){
-		  for(t = 1; t < *ntime; t++){
+	    for(j = 0; j < *nsubject; j++){
+	      for(t = 1; t < *ntime; t++){
 		    sumg = sumg + gamma_iter[j*ntime1 + t];
 		  }
-		}
+	    }
 
-//		Rprintf("sumg = %d\n", sumg);
-		astar = (double) sumg + a;
-		bstar = (double) ((*nsubject)*(*ntime-1) - sumg) + b;
-			
-//		Rprintf("astar = %f\n", astar);
-//		Rprintf("bstar = %f\n", bstar);
+		astar = (double) sumg + alphaPriors[0];
+		bstar = (double) ((*nsubject)*(*ntime-1) - sumg) + alphaPriors[1];
 			
 		alpha_tmp = rbeta(astar, bstar);
 
-		for(t=ts;t<*ntime;t++){alpha_iter[t] = alpha_tmp;}
-//		  Rprintf("alpha_iter = %f\n", alpha_iter);
-	
-      } else {
-			
-		for(t = 0; t < *ntime; t++){
-		  sumg = 0;
+		for(t=1;t<*ntime;t++){alpha_iter[t] = alpha_tmp;}
+	    alpha_iter[0] = 1.0;
+      }
+      if(*time_specific_alpha == 1 & *unit_specific_alpha==0){    
+	    for(t = 1; t < *ntime; t++){
+	      sumg = 0;
 		  for(j = 0; j < *nsubject; j++){
 		    sumg = sumg + gamma_iter[j*ntime1 + t];
 		  }
 	
-//		  Rprintf("sumg = %d\n", sumg);
-	
-		  astar = (double) sumg + a;
-		  bstar = (double) ((*nsubject) - sumg) + b;
+		  astar = (double) sumg + alphaPriors[0];
+		  bstar = (double) ((*nsubject) - sumg) + alphaPriors[1];
 
-//		  Rprintf("astar = %f\n", astar);
-//		  Rprintf("bstar = %f\n", bstar);
-
-	
 		  alpha_iter[t] = rbeta(astar, bstar);
-	
-		}
-			
+        }
+	    alpha_iter[0] = 1.0;
+      } 
+      if(*time_specific_alpha == 0 & *unit_specific_alpha==1){
+        for(j = 0; j < *nsubject; j++){
+          sumg = 0;
+          for(t = 1; t < *ntime; t++){
+		    sumg = sumg + gamma_iter[j*ntime1 + t];
+          }
+          
+		  astar = (double) sumg + alphaPriors[j*2 + 0];
+		  bstar = (double) ((*ntime-1) - sumg) + + alphaPriors[j*2 + 1];
+		  
+		  alpha_iter[j*ntime1 + 1] = rbeta(astar, bstar);
+        }
 	  }
-	  alpha_iter[0] = 0.0;
+      if(*time_specific_alpha == 1 & *unit_specific_alpha==1){
+        for(j = 0; j < *nsubject; j++){
+          for(t = 1; t < *ntime; t++){
+            sumg =  gamma_iter[j*ntime1 + t];
+
+		    astar = (double) sumg + alphaPriors[j*2 + 0];
+		    bstar = (double) ((*ntime-1) - sumg) + + alphaPriors[j*2 + 1];
+		  
+		    alpha_iter[j*ntime1 + t] = rbeta(astar, bstar);
+          }
+        }
+	  }
     }
 
-//	RprintVecAsMat("alpha_iter", alpha_iter, 1, *ntime);
+//	RprintVecAsMat("alpha_iter", alpha_iter, *nsubject, ntime1);
 	
 
     //////////////////////////////////////////////////////////////////////////////
@@ -1470,7 +1418,7 @@ void informed_ar1_sppm(int *draws, int *burn, int *thin, int *nsubject, int *nti
     lam2tmp = lam2_iter*(1.0 - phi1sq);
  
     sumt = 0.0;
-    for(t=(ts+1); t<*ntime; t++){
+    for(t=2; t<*ntime; t++){
       sumt = sumt + (theta_iter[t] - phi1_iter*theta_iter[t-1]);		
     }
     	
@@ -1492,7 +1440,7 @@ void informed_ar1_sppm(int *draws, int *burn, int *thin, int *nsubject, int *nti
     	
       if(np1 > -1 & np1 < 1){
         llo = 0.0, lln = 0.0;
-    	for(t=(ts+1); t < *ntime; t++){// Note that we are starting at ts + 1 since ts is the first time point
+    	for(t=2; t < *ntime; t++){// Note that we are starting at ts + 1 since ts is the first time point
     
     	  llo = llo + dnorm(theta_iter[t], phi0_iter*(1-op1) + op1*theta_iter[t-1], 
     			    	                             sqrt(lam2_iter*(1.0 - op1*op1)), 1);
@@ -1522,7 +1470,7 @@ void informed_ar1_sppm(int *draws, int *burn, int *thin, int *nsubject, int *nti
     if(nl > 0.0){
       lln = 0.0;
       llo = 0.0;
-      for(t=(ts+1); t<*ntime; t++){
+      for(t=2; t<*ntime; t++){
         llo = llo + dnorm(theta_iter[t],
     			                  phi0_iter*(1-phi1_iter) + phi1_iter*theta_iter[t-1], ol*sqrt(1-phi1sq),1);
     	lln = lln + dnorm(theta_iter[t],
@@ -1589,7 +1537,7 @@ void informed_ar1_sppm(int *draws, int *burn, int *thin, int *nsubject, int *nti
     
     
     		if(*update_alpha == 1){
-    			if(*global_alpha == 1){
+    			if(*time_specific_alpha == 1){
     				
     				
     				n_red = 0;
@@ -1674,7 +1622,9 @@ void informed_ar1_sppm(int *draws, int *burn, int *thin, int *nsubject, int *nti
     			}
     		}
     	}	
-*/    
+*/ 
+
+   
     ////////////////////////////////////////////////////////////////////////////////////////////
     //
     // evaluating likelihood that will be used to calculate LPML and WAIC? 
@@ -1685,19 +1635,19 @@ void informed_ar1_sppm(int *draws, int *burn, int *thin, int *nsubject, int *nti
     	
       like0=0;
       for(j = 0; j < *nsubject; j++){
-        for(t = ts; t < *ntime; t++){
+        for(t = 1; t < *ntime; t++){
     
     	  mudraw = muh[(Si_iter[j*(ntime1) + t]-1)*(ntime1) + t];
     	  sigdraw = sqrt(sig2h[(Si_iter[j*(ntime1) + t]-1)*(ntime1) + t]);
     
     
-    	  if(t == ts){
+    	  if(t == 1){
     
     	    like_iter[j*(*ntime)+t] = dnorm(y[j*(*ntime)+t], mudraw, sigdraw, 1);
     	    fitted_iter[j*(*ntime)+t] = mudraw;
     				
     	  }
-    	  if(t > ts){
+    	  if(t > 1){
     
     	    like_iter[j*(*ntime)+t] = dnorm(y[j*(*ntime)+t], 
     										  mudraw + eta1_iter[j]*y[j*(*ntime)+t-1], 
@@ -1720,7 +1670,7 @@ void informed_ar1_sppm(int *draws, int *burn, int *thin, int *nsubject, int *nti
     
       if(like0==0){
         for(j = 0; j < *nsubject; j++){
-    	  for(t = ts; t < *ntime; t++){
+    	  for(t = 1; t < *ntime; t++){
     	    CPO[j*(*ntime)+t] = CPO[j*(*ntime)+t] + (1/exp(like_iter[j*(*ntime)+t]));
     	  }
     	}
@@ -1735,20 +1685,23 @@ void informed_ar1_sppm(int *draws, int *burn, int *thin, int *nsubject, int *nti
     //																				//
     //////////////////////////////////////////////////////////////////////////////////
     if((i > (*burn-1)) & ((i+1) % *thin == 0)){
-    
-      for(t = 0; t < *ntime; t++){
-        alpha_out[ii*(*ntime) + t] = alpha_iter[t];
-    	theta[ii*(*ntime) + t] = theta_iter[t];
-    	tau2[ii*(*ntime) + t] = tau2_iter[t];
+      // Notice that I am not saving the "first" time as it belongs to the 
+      // vector of zeros added to the data and nothing is updated. 
+      for(t = 1; t < *ntime; t++){
+        if(*unit_specific_alpha==0) alpha_out[ii*(*ntime) + t-1] = alpha_iter[t];
+    	theta[ii*(*ntime) + t-1] = theta_iter[t];
+    	tau2[ii*(*ntime) + t-1] = tau2_iter[t];
     
     	for(j = 0; j < *nsubject; j++){
-          sig2[(ii*(*nsubject) + j)*(*ntime) + t] = sig2h[(Si_iter[j*(ntime1) + t]-1)*(ntime1) + t];
-    	  mu[(ii*(*nsubject) + j)*(*ntime) + t] = muh[(Si_iter[j*(ntime1) + t]-1)*(ntime1) + t];
-    	  Si[(ii*(*nsubject) + j)*(*ntime) + t] = Si_iter[j*ntime1 + t];	
-    	  gamma[(ii*(*nsubject) + j)*(*ntime) + t] = gamma_iter[j*ntime1 + t];	
+          if(*unit_specific_alpha==1) alpha_out[(ii*(*nsubject) + j)*(*ntime) +  t-1] = alpha_iter[j*ntime1 + t];
+
+          sig2[(ii*(*nsubject) + j)*(*ntime) + t-1] = sig2h[(Si_iter[j*(ntime1) + t]-1)*(ntime1) + t];
+    	  mu[(ii*(*nsubject) + j)*(*ntime) + t-1] = muh[(Si_iter[j*(ntime1) + t]-1)*(ntime1) + t];
+    	  Si[(ii*(*nsubject) + j)*(*ntime) + t-1] = Si_iter[j*ntime1 + t];	
+    	  gamma[(ii*(*nsubject) + j)*(*ntime) + t-1] = gamma_iter[j*ntime1 + t];	
     
-    	  llike[(ii*(*nsubject) + j)*(*ntime) + t] = like_iter[j*(*ntime)+t];	
-    	  fitted[(ii*(*nsubject) + j)*(*ntime) + t] = fitted_iter[j*(*ntime)+t];	
+    	  llike[(ii*(*nsubject) + j)*(*ntime) + t-1] = like_iter[j*(*ntime)+t];	
+    	  fitted[(ii*(*nsubject) + j)*(*ntime) + t-1] = fitted_iter[j*(*ntime)+t];	
     
     	}
       }
@@ -1764,44 +1717,39 @@ void informed_ar1_sppm(int *draws, int *burn, int *thin, int *nsubject, int *nti
       ii = ii+1;
     
     }
+    /**/
   }
 
 
 	
-	lpml_iter=0.0;
-	for(t = ts; t < *ntime; t++){
-//		Rprintf("t = %d\n", t);
-		for(j = 0; j < *nsubject; j++){
-//			Rprintf("j = %d\n", j);
-
-//			Rprintf("CPO = %f\n", CPO[j*(*ntime)+t]);
-				
-			lpml_iter = lpml_iter - log((1/(double) nout-nout_0)*CPO[j*(*ntime)+t]);
-				
-		}
-	}
-//	Rprintf("nout_0 = %d\n", nout_0);
-	lpml[0] = lpml_iter;
-//	Rprintf("lpml_iter = %f\n", lpml_iter);
-
-
-	elppdWAIC = 0.0;
-//	RprintVecAsMat("mnlike",mnlike, 1,(*nsubject)*(ntime1));
-//	RprintVecAsMat("mnllike", mnllike, 1, (*nsubject)*(ntime1));
-		
+  lpml_iter=0.0;
+  for(t = 1; t < *ntime; t++){
+//  Rprintf("t = %d\n", t);
 	for(j = 0; j < *nsubject; j++){
-		for(t = ts; t < *ntime; t++){		
-			elppdWAIC = elppdWAIC + (2*mnllike[j*(*ntime)+t] - log(mnlike[j*(*ntime)+t]));  
-		}
+//	  Rprintf("j = %d\n", j);
+//	  Rprintf("CPO = %f\n", CPO[j*(*ntime)+t]);
+				
+	  lpml_iter = lpml_iter - log((1/(double) nout-nout_0)*CPO[j*(*ntime)+t]);
+				
 	}
-	waic[0] = -2*elppdWAIC; 
+  }
+//Rprintf("nout_0 = %d\n", nout_0);
+  lpml[0] = lpml_iter;
+//Rprintf("lpml_iter = %f\n", lpml_iter);
 
 
-	PutRNGstate();
+  elppdWAIC = 0.0;
+//RprintVecAsMat("mnlike",mnlike, 1,(*nsubject)*(ntime1));
+//RprintVecAsMat("mnllike", mnllike, 1, (*nsubject)*(ntime1));
+		
+  for(j = 0; j < *nsubject; j++){
+    for(t = 1; t < *ntime; t++){		
+	  elppdWAIC = elppdWAIC + (2*mnllike[j*(*ntime)+t] - log(mnlike[j*(*ntime)+t]));  
+	}
+  }
+  waic[0] = -2*elppdWAIC; 
 
-
-	
-
+  PutRNGstate();
 }
 
 

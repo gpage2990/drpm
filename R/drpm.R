@@ -7,16 +7,22 @@
 # 3 - temporal dependenc in the partition model
 # 4 - Spatial information in the partition model.
 
-drpm_fit <- function(y,s_coords=NULL, M=1, centering_partition=NULL,
-					starting_alpha=0.5,
-					alpha_0=FALSE,eta1_0=FALSE,phi1_0=FALSE,global_alpha=TRUE,
-					modelPriors=c(0,100^2,1,1,1,1,1,1),
-					alphaPriors=c(1,1),
-					SpatialCohesion=4,
-					cParms=c(0, 1, 2, 1),
-					mh=c(0.5, 1, 0.1, 0.1, 0.1),
-					verbose=FALSE,
-					draws=1100,burn=100,thin=1){
+drpm_fit <- function(y,s_coords=NULL,
+                     M=1,
+                     centering_partition=NULL,
+					           starting_alpha=0.5,
+					           unit_specific_alpha = FALSE,
+					           time_specific_alpha = FALSE,
+					           alpha_0=FALSE, # TRUE means alpha=starting_alpha not updated
+					           eta1_0=FALSE, # TRUE means that eta1 = 0 not updated
+					           phi1_0=FALSE, # TRUE means that phi1 = 0 not updated
+					           modelPriors=c(0,100^2,1,1,1,1),
+					           alphaPriors=c(1,1),  # I need to add this to the DRPM AR1 SPPM function
+					           SpatialCohesion=4,
+					           cParms=c(0, 1, 2, 1),
+					           mh=c(0.5, 1, 0.1, 0.1, 0.1),
+					           verbose=FALSE,
+					           draws=1100,burn=100,thin=1){
 
 	nout <- (draws-burn)/thin
 
@@ -38,6 +44,10 @@ drpm_fit <- function(y,s_coords=NULL, M=1, centering_partition=NULL,
 
 	sPPM <- ifelse(is.null(s1), FALSE, TRUE)
   if(is.null(centering_partition)) centering_partition <- 0
+	if(unit_specific_alpha) alpha_out <- matrix(0.5, nrow=nout, ncol=ntime*nsubject)
+  if(unit_specific_alpha & nrow(alphaPriors) != nsubject){
+    stop("you have selected unit-specific-alpha option but did not suppl correct alpha prior")
+  }
 	cat("sPPM = ", sPPM, "\n")
 
 #if(!sPPM){
@@ -48,7 +58,7 @@ drpm_fit <- function(y,s_coords=NULL, M=1, centering_partition=NULL,
 #      as.integer(nsubject),as.integer(ntime),
 #      as.double(t(y)), as.double(s1), as.double(s2),
 #      as.double(M),
-#      as.double(modelPriors),as.integer(global_alpha),
+#      as.double(modelPriors),as.integer(time_specific_alpha),
 #      as.integer(alpha_0), as.integer(eta1_0), as.integer(phi1_0),
 #      as.integer(sPPM), as.integer(SpatialCohesion), as.double(cParms),
 #      as.double(mh), as.integer(verbose),
@@ -74,8 +84,9 @@ drpm_fit <- function(y,s_coords=NULL, M=1, centering_partition=NULL,
         as.integer(draws), as.integer(burn),as.integer(thin),
         as.integer(nsubject),as.integer(ntime),
         as.double(t(y)), as.double(s1), as.double(s2),
-        as.double(M), as.integer(centering_partition), as.double(alpha),
-        as.double(modelPriors),as.double(t(alphaPriors)),as.integer(global_alpha),
+        as.double(M), as.double(alpha),
+        as.double(modelPriors),as.double(t(alphaPriors)),
+        as.integer(time_specific_alpha),
         as.integer(update_alpha), as.integer(update_eta1), as.integer(update_phi1),
         as.integer(sPPM), as.integer(SpatialCohesion), as.double(cParms),
         as.double(mh), as.integer(space_1),
@@ -94,7 +105,8 @@ drpm_fit <- function(y,s_coords=NULL, M=1, centering_partition=NULL,
 	              as.integer(nsubject),as.integer(ntime),
 	              as.double(t(y)), as.double(s1), as.double(s2),
 	              as.double(M), as.integer(centering_partition), as.double(alpha),
-	              as.double(modelPriors),as.double(t(alphaPriors)),as.integer(global_alpha),
+	              as.double(modelPriors),as.double(t(alphaPriors)),
+	              as.integer(time_specific_alpha), as.integer(unit_specific_alpha),
 	              as.integer(update_alpha), as.integer(update_eta1), as.integer(update_phi1),
 	              as.integer(sPPM), as.integer(SpatialCohesion), as.double(cParms),
 	              as.double(mh), as.integer(space_1),
@@ -110,14 +122,16 @@ drpm_fit <- function(y,s_coords=NULL, M=1, centering_partition=NULL,
 #}
 
 	out <- NULL
-
-  out$Si <- array(C.out$Si.draws, c(ntime,nsubject,nout))
-  out$gamma <- array(C.out$gamma.draws, c(ntime,nsubject,nout))
-  out$mu <- array(C.out$mu.draws, c(ntime,nsubject,nout))
-  out$sig2 <- array(C.out$sig2.draws, c(ntime,nsubject,nout))
-  out$theta <- matrix(C.out$theta.draws, nrow=nout, byrow=TRUE)
-  out$tau2 <- matrix(C.out$tau2.draws,nrow=nout, byrow=TRUE)
-  out$alpha <- matrix(C.out$alpha.draws,nrow=nout, byrow=TRUE)
+	ntime_out <- ntime
+  if(!is.null(centering_partition)) ntime_out <- ntime - 1
+	out$Si <- array(C.out$Si.draws, c(ntime,nsubject,nout))[1:ntime_out,,,drop=FALSE]
+  out$gamma <- array(C.out$gamma.draws, c(ntime,nsubject,nout))[1:ntime_out,,,drop=FALSE]
+  out$mu <- array(C.out$mu.draws, c(ntime,nsubject,nout))[1:ntime_out,,,drop=FALSE]
+  out$sig2 <- array(C.out$sig2.draws, c(ntime,nsubject,nout))[1:ntime_out,,,drop=FALSE]
+  if(unit_specific_alpha) out$alpha <- array(C.out$alpha, c(ntime,nsubject,nout))[1:ntime_out,,,drop=FALSE]
+  if(!unit_specific_alpha) out$alpha <- matrix(C.out$alpha.draws,nrow=nout, byrow=TRUE)[,1:ntime_out,drop=FALSE]
+  out$theta <- matrix(C.out$theta.draws, nrow=nout, byrow=TRUE)[,1:ntime_out,drop=FALSE]
+  out$tau2 <- matrix(C.out$tau2.draws,nrow=nout, byrow=TRUE)[,1:ntime_out,drop=FALSE]
 
   out$eta1 <- matrix(C.out$eta1.draws,nrow=nout, byrow=TRUE)
 
@@ -125,10 +139,12 @@ drpm_fit <- function(y,s_coords=NULL, M=1, centering_partition=NULL,
   out$phi1 <- matrix(C.out$phi1.draws,nrow=nout, byrow=TRUE)
   out$lam2 <- matrix(C.out$lam2.draws,nrow=nout, byrow=TRUE)
 
-  out$llike <- matrix(C.out$llike.draws,nrow=nout, byrow=TRUE)
-  out$fitted <- matrix(C.out$fitted.draws,nrow=nout, byrow=TRUE)
+  out$llike <- array(C.out$llike.draws, c(ntime,nsubject,nout))[1:ntime_out,,,drop=FALSE]
+  out$fitted <- array(C.out$fitted.draws, c(ntime,nsubject,nout))[1:ntime_out,,,drop=FALSE]
   out$lpml <- C.out$lpml.out
   out$waic <- C.out$waic.out
+
+  out$centering_partition = centering_partition
 
   out
 
