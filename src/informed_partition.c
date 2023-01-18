@@ -104,11 +104,23 @@ void informed_ar1_sppm(int *draws, int *burn, int *thin,
   Rprintf("update_eta1 = %d\n", *update_eta1);
   Rprintf("update_phi1 = %d\n", *update_phi1);
   
+  
+  RprintIVecAsMat("cp", centering_partition, 1, *nsubject);
   int cp = centering_partition[0];
   Rprintf("cp = %d\n", centering_partition[0]);
+  Rprintf("Fitting informed partition model \n");
 //  RprintIVecAsMat("cp_vec", centering_partition, 1, *nsubject);	
 //  RprintVecAsMat("y = ", y, *nsubject, *ntime);
 	
+
+//  RprintVecAsMat("y = ", y, *nsubject, *ntime);
+  
+  Rprintf("alpha = %f\n", *alpha);
+  Rprintf("sPPM = %d\n", *sPPM);
+  RprintVecAsMat("s1", s1, 1, *nsubject);
+  Rprintf("M = %f\n", *M);
+  Rprintf("time_specific_alpha = %d\n", *time_specific_alpha);
+  Rprintf("unit_specific_alpha = %d\n", *unit_specific_alpha);
 	
   // ===================================================================================
   // 
@@ -162,10 +174,10 @@ void informed_ar1_sppm(int *draws, int *burn, int *thin,
   for(j = 0; j < *nsubject; j++){ 
     alpha_iter[j*(ntime1) + 0]=1.0;
     for(t = 0; t < ntime1; t++){ // Note I am not initializing the "added time memory"
-	  Si_iter[j*(ntime1) + t] = 1;
+	  Si_iter[j*(ntime1) + t] = centering_partition[j];
 	  gamma_iter[j*(ntime1) + t] = 0;
 	  nh[j*(ntime1) + t] = 0;
-	  if(t==1) Si_iter[j*ntime1 + t] = 1;
+//	  if(t==1) Si_iter[j*ntime1 + t] = 1;
 	  if(t==*ntime) Si_iter[j*(ntime1) + t] = 0;
     }
   }
@@ -301,7 +313,7 @@ void informed_ar1_sppm(int *draws, int *burn, int *thin,
 
 
 
-  Rprintf("Prior values: Asig = %.2f, Atau = %.2f, Alam = %.2f, \n m0 = %.2f, s20 = %.2f\n\n",
+  Rprintf("Prior values: Asig = %.2f, Atau = %.2f, Alam = %.2f, \n \ \ \ \ m0 = %.2f, s20 = %.2f\n\n",
              Asig, Atau, Alam, m0, s20);
 
 
@@ -312,11 +324,12 @@ void informed_ar1_sppm(int *draws, int *burn, int *thin,
   double *L0 = R_VectorInit(2*2,0.0);
   L0[0] = cParms[3]; L0[3] = cParms[3];
 	
-  RprintVecAsMat("mu0", mu0, 1, 2);
-  Rprintf("k0 = %f\n", k0);
-  Rprintf("v0 = %f\n", v0);
-  RprintVecAsMat("L0", L0, 2, 2);
-
+  if(*sPPM==1){	
+    RprintVecAsMat("mu0", mu0, 1, 2);
+    Rprintf("k0 = %f\n", k0);
+    Rprintf("v0 = %f\n", v0);
+    RprintVecAsMat("L0", L0, 2, 2);
+  }
 
 //	RprintVecAsMat("mh", mh, 1, 5);
   // M-H step tunning parameter
@@ -337,7 +350,7 @@ void informed_ar1_sppm(int *draws, int *burn, int *thin,
 	
   for(i = 0; i < *draws; i++){
 
-    if((i+1) % 100000 == 0){
+    if((i+1) % 1000 == 0){
 	  time_t now;
 	  time(&now);
 
@@ -378,8 +391,8 @@ void informed_ar1_sppm(int *draws, int *burn, int *thin,
           if(gamma_iter[jj*ntime1 + (t)] == 1){
             if(jj != j){
               Si_tmp[Rindx1] = Si_iter[jj*ntime1 + (t)];
-        	    Si_tmp2[Rindx1] = Si_iter[jj*ntime1 + (t)];
-        	    comptm1[Rindx1] = Si_iter[jj*ntime1 + (t-1)]; // for t=1, this references cp
+        	  Si_tmp2[Rindx1] = Si_iter[jj*ntime1 + (t)];
+        	  comptm1[Rindx1] = Si_iter[jj*ntime1 + (t-1)]; // for t=1, this references cp
         
         	    // Also get the reduced spatial coordinates if
         	    // space is included
@@ -464,7 +477,7 @@ void informed_ar1_sppm(int *draws, int *burn, int *thin,
           
           rho_comp = compatibility(Si_red_1, comptm1, Rindx1+1);
           
-          if(rho_comp==0) lgweight[k] = log(0);
+//          if(rho_comp==0) lgweight[k] = log(0); // compatibility isn't checked for neal's alg 8 part
           
         }
 				
@@ -485,7 +498,7 @@ void informed_ar1_sppm(int *draws, int *burn, int *thin,
                 
         rho_comp = compatibility(Si_red_1, comptm1, Rindx1+1);
         
-        if(rho_comp == 0) lgweight[nclus_red] = log(0);
+//        if(rho_comp==0) lgweight[nclus_red] = log(0); // compatibility isn't checked for neal's alg 8 part
         		
         				
         denph = 0.0;
@@ -517,7 +530,7 @@ void informed_ar1_sppm(int *draws, int *burn, int *thin,
           probh[1] = alpha_iter[t]/(alpha_iter[t] + (1-alpha_iter[t])*lgweight[cit_1-1]);
         }
 
-        // Rprintf("probh[1] = %f\n", probh[1]);
+//         Rprintf("probh[1] = %f\n", probh[1]);
 
 
         // If gamma is 1 at current MCMC iterate, then there are no 
@@ -543,6 +556,7 @@ void informed_ar1_sppm(int *draws, int *burn, int *thin,
 
           // Get rho_t | gamma_t = 1 and rho_{t-1} | gamma_t = 1
           // when gamma_{it} = 1;
+//		  Rprintf("t = %d\n", t);
           Rindx1 = 0;
           for(jj = 0; jj < *nsubject; jj++){
             if(gamma_iter[jj*ntime1 + (t)] == 1){
@@ -558,6 +572,10 @@ void informed_ar1_sppm(int *draws, int *burn, int *thin,
           	  Rindx1 = Rindx1 + 1;
             }							
           }
+//        RprintIVecAsMat("Si_iter", Si_iter, *nsubject, ntime1);
+//		  Rprintf("Rindx1 = %d\n", Rindx1);
+//		  RprintIVecAsMat("comptm1", comptm1, 1, *nsubject);
+//		  RprintIVecAsMat("comp1t", comp1t, 1, *nsubject);
           
           rho_comp = compatibility(comptm1, comp1t, Rindx1);
           
@@ -1314,7 +1332,7 @@ void informed_ar1_sppm(int *draws, int *burn, int *thin,
         if(e1n < 1 & e1n > -1){
 					
           llo=lln=0.0;
-          for(t=2; t<*ntime; t++){// need to skip the first "Y" as it is a column of zeros to accomodate rho0
+          for(t=1; t<*ntime; t++){// need to skip the first "Y" as it is a column of zeros to accomodate rho0
             llo = llo + dnorm(y[j*(*ntime)+t], 
                                   muh[(Si_iter[j*(ntime1) + t]-1)*(ntime1) + t] + e1o*y[j*(*ntime)+t-1],
                                   sqrt(sig2h[(Si_iter[j*(ntime1) + t]-1)*(ntime1) + t]*(1-e1o*e1o)), 1);
@@ -1339,7 +1357,6 @@ void informed_ar1_sppm(int *draws, int *burn, int *thin,
       }
     }
 
-//	RprintVecAsMat("eta1", eta1_iter, 1, *nsubject);
 
     //////////////////////////////////////////////////////////////////////////////
     //																			//
@@ -1347,19 +1364,27 @@ void informed_ar1_sppm(int *draws, int *burn, int *thin,
     //																			//
     //////////////////////////////////////////////////////////////////////////////
     if(*update_alpha == 1){
+//      Rprintf("updating alpha \n");
+//	    RprintIVecAsMat("Si_iter ", Si_iter, *nsubject, ntime1);
+//      RprintIVecAsMat("gamma_iter ", gamma_iter, *nsubject, ntime1);
 	  if(*time_specific_alpha == 0 & *unit_specific_alpha==0){
-
+      
 	    sumg = 0;
 	    for(j = 0; j < *nsubject; j++){
 	      for(t = 1; t < *ntime; t++){
 		    sumg = sumg + gamma_iter[j*ntime1 + t];
 		  }
 	    }
-
+//        Rprintf("sumg = %d\n", sumg);
+//        Rprintf("alphaPriors[0] = %f\n", alphaPriors[0]);
+//        Rprintf("alphaPriors[1] = %f\n", alphaPriors[1]);
 		astar = (double) sumg + alphaPriors[0];
 		bstar = (double) ((*nsubject)*(*ntime-1) - sumg) + alphaPriors[1];
 			
+//        Rprintf("astar = %f\n", astar);
+//        Rprintf("bstar = %f\n", bstar);
 		alpha_tmp = rbeta(astar, bstar);
+//        Rprintf("alpha = %f\n", alpha_tmp);
 
 		for(t=1;t<*ntime;t++){alpha_iter[t] = alpha_tmp;}
 	    alpha_iter[0] = 1.0;
@@ -1370,6 +1395,9 @@ void informed_ar1_sppm(int *draws, int *burn, int *thin,
 		  for(j = 0; j < *nsubject; j++){
 		    sumg = sumg + gamma_iter[j*ntime1 + t];
 		  }
+//          Rprintf("sumg = %d\n", sumg);
+//          Rprintf("alphaPriors[0] = %f\n", alphaPriors[0]);
+//          Rprintf("alphaPriors[1] = %f\n", alphaPriors[1]);
 	
 		  astar = (double) sumg + alphaPriors[0];
 		  bstar = (double) ((*nsubject) - sumg) + alphaPriors[1];
@@ -1386,7 +1414,7 @@ void informed_ar1_sppm(int *draws, int *burn, int *thin,
           }
           
 		  astar = (double) sumg + alphaPriors[j*2 + 0];
-		  bstar = (double) ((*ntime-1) - sumg) + + alphaPriors[j*2 + 1];
+		  bstar = (double) ((*ntime-1) - sumg) +  alphaPriors[j*2 + 1];
 		  
 		  alpha_iter[j*ntime1 + 1] = rbeta(astar, bstar);
         }
@@ -1397,7 +1425,7 @@ void informed_ar1_sppm(int *draws, int *burn, int *thin,
             sumg =  gamma_iter[j*ntime1 + t];
 
 		    astar = (double) sumg + alphaPriors[j*2 + 0];
-		    bstar = (double) ((*ntime-1) - sumg) + + alphaPriors[j*2 + 1];
+		    bstar = (double) ((*ntime-1) - sumg) +  alphaPriors[j*2 + 1];
 		  
 		    alpha_iter[j*ntime1 + t] = rbeta(astar, bstar);
           }

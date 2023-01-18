@@ -1,28 +1,28 @@
 \name{drpm_fit}
 \alias{drpm_fit}
-\title{Function that fits spatio-temporal hierarchical Gaussian model that is based on a dependent random partition model}
+\title{Function that fits spatio-temporal hierarchical Gaussian model with a dependent random partition model}
 \usage{
 drpm_fit(y,
          s_coords=NULL,
          M=1,
+         initial_partition = NULL,
+         starting_alpha = 0.5,
+         unit_specific_alpha = FALSE,
+         time_specific_alpha = FALSE,
          alpha_0=FALSE,
          eta1_0=FALSE,
          phi1_0=FALSE,
-         global_alpha=TRUE,
          modelPriors=c(0,100^2,1,1,1,1),
-         alphaPriors=c(1,1),
+         alphaPriors=rbind(c(1,1)),
          SpatialCohesion=4,
          cParms=c(0, 1, 2, 1),
          mh=c(0.5, 1, 0.1, 0.1, 0.1),
          verbose=FALSE,
-         draws=1100,
-         burn=100,
-         thin=1)
+         draws=1100,burn=100,thin=1)
 }
 
-
 \description{
-\code{drpm_fit} is the main function used to fit model with Guassian data model and spatio-temporal dependent random partition model.  In the model, temporal dependence could possible appear in three places a) AR(1) process in data model, b) AR(1) process associated with mean model of atmos, c) temporal dependence in the partition.  Details follow regarding how to flip each of these switches on.
+\code{drpm_fit} is the main function used to fit model with Gaussian likelihood and spatio-temporal dependent random partition model.  An initial ``guess'' on the partition can be provided as well as prior information on the ``certainty'' associated with the initial guess.   In the model, temporal dependence could possibly appear in three places a) AR(1) process in data model, b) AR(1) process associated with mean model of atoms, c) temporal dependence in the partition.
 
 }
 
@@ -33,9 +33,15 @@ drpm_fit(y,
 
 \item{M}{Parameter related to Dirichlet process scale or dispersion parameter.}
 
-\item{global_alpha}{Logical indicating if alpha is constant across time.}
+\item{initial_partition}{The initial partition that is illicited from an expert.}
 
-\item{alpha_0}{Logical where TRUE indicates alpha_t = 0 (i.e., iid partition model used)}
+\item{starting_alpha}{Initial value for alpha.  If alpha_0 = TRUE (see below), then alpha is fixed to this value.}
+
+\item{unit_specific_alpha}{Logical that indicates if a unique alpha is to be included for each unit.}
+
+\item{time_specific_alpha}{Logical that indicates if a unique alpha is to be included for each time point.}
+
+\item{alpha_0}{Logical where TRUE indicates alpha_t = starting_alpha (i.e., alpha is not updated)}
 
 \item{eta1_0}{Logical where TRUE indicates eta1 = 0 (i.e., observations are conditionally independent).}
 
@@ -47,22 +53,21 @@ drpm_fit(y,
 	\item {s20 - variance of phi0}
 	\item {A - upper bound on sigma }
 	\item {At - upper bound on tau }
-	\item {Al - Upper bound on lambda }
+	\item {Al - upper bound on lambda }
 	\item {be - scale prior for xi}
   }
 }
-\item{alphaPriors}{Matrix containing beta prior values for the alpha parameters.  The columns correspond to the 1st and 2nd shape beta shape parameters.  The number of rows corresponds to the number of clusters in the centering partition.  If no centering partition is supplied then this only the first row is used.
+\item{alphaPriors}{Matrix containing beta prior values for the alpha parameters.  The columns correspond to the 1st and 2nd shape beta shape parameters.  The number of rows corresponds to the number of units.  If no initial partition is supplied then only the first row is used.
 }
 
-\item{SpatialCohesion}{Logical indicating what cohesion to use if spatial coordinates are provided
+\item{SpatialCohesion}{Scalar indicating what cohesion to use if spatial coordinates are provided
 \itemize{
 \item {3 - auxiliary similarity }
 \item {4 - double dipper similarity }
   }
 }
 
-
-\item{cParms}{Vector containing cohesion parameter values (see below for more details)
+\item{cParms}{Vector containing spatial cohesion parameter values (see below for more details)
 \itemize{
 \item {mu0 - center of NNIG }
 \item {k0 - scale parameter of gaussian part of NNIG }

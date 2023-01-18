@@ -307,11 +307,12 @@ void drpm_ar1_sppm(int *draws, int *burn, int *thin, int *nsubject, int *ntime,
 	double *L0 = R_VectorInit(2*2,0.0);
 	L0[0] = cParms[3]; L0[3] = cParms[3];
 	
-	RprintVecAsMat("mu0", mu0, 1, 2);
-	Rprintf("k0 = %f\n", k0);
-	Rprintf("v0 = %f\n", v0);
-	RprintVecAsMat("L0", L0, 2, 2);
-
+    if(*sPPM==1){	
+	  RprintVecAsMat("mu0", mu0, 1, 2);
+	  Rprintf("k0 = %f\n", k0);
+	  Rprintf("v0 = %f\n", v0);
+	  RprintVecAsMat("L0", L0, 2, 2);
+    }
 
 //	RprintVecAsMat("mh", mh, 1, 5);
 	// M-H step tunning parameter
@@ -332,7 +333,7 @@ void drpm_ar1_sppm(int *draws, int *burn, int *thin, int *nsubject, int *ntime,
 	
 	for(i = 0; i < *draws; i++){
 
-		if((i+1) % 100000 == 0){
+		if((i+1) % 10000 == 0){
 			time_t now;
 			time(&now);
 
@@ -1654,7 +1655,7 @@ void drpm_ar1_sppm(int *draws, int *burn, int *thin, int *nsubject, int *ntime,
 			
 			}
 
-			alpha_iter[0] = 0.0;
+			//alpha_iter[0] = 0.0;
 
 		}
 
