@@ -29,6 +29,7 @@ drpm_fit <- function(y,s_coords=NULL,
 	nsubject = nrow(y)
 	if(!is.null(initial_partition)){
 	  y <- cbind(rep(0, nsubject), y)
+	  if(length(initial_partition) != nsubject) stop("initial partition is not the correct length")
 	}
 	ntime = ncol(y)
 
@@ -82,7 +83,7 @@ drpm_fit <- function(y,s_coords=NULL,
 	ntime_out <- ntime
 
 	if(!is.null(initial_partition)){
-	  cat(initial_partition, "\n")
+	  #cat(initial_partition, "\n")
 	  C.out <- .C("informed_ar1_sppm",
 	              as.integer(draws), as.integer(burn),as.integer(thin),
 	              as.integer(nsubject),as.integer(ntime),

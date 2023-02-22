@@ -107,17 +107,16 @@ void informed_ar1_sppm(int *draws, int *burn, int *thin,
   
   RprintIVecAsMat("cp", centering_partition, 1, *nsubject);
   int cp = centering_partition[0];
+  
   Rprintf("cp = %d\n", centering_partition[0]);
   Rprintf("Fitting informed partition model \n");
-//  RprintIVecAsMat("cp_vec", centering_partition, 1, *nsubject);	
-//  RprintVecAsMat("y = ", y, *nsubject, *ntime);
 	
 
 //  RprintVecAsMat("y = ", y, *nsubject, *ntime);
   
   Rprintf("alpha = %f\n", *alpha);
   Rprintf("sPPM = %d\n", *sPPM);
-  RprintVecAsMat("s1", s1, 1, *nsubject);
+//  RprintVecAsMat("s1", s1, 1, *nsubject);
   Rprintf("M = %f\n", *M);
   Rprintf("time_specific_alpha = %d\n", *time_specific_alpha);
   Rprintf("unit_specific_alpha = %d\n", *unit_specific_alpha);
@@ -174,7 +173,7 @@ void informed_ar1_sppm(int *draws, int *burn, int *thin,
   for(j = 0; j < *nsubject; j++){ 
     alpha_iter[j*(ntime1) + 0]=1.0;
     for(t = 0; t < ntime1; t++){ // Note I am not initializing the "added time memory"
-	  Si_iter[j*(ntime1) + t] = centering_partition[j];
+	  Si_iter[j*(ntime1) + t] = 1;
 	  gamma_iter[j*(ntime1) + t] = 0;
 	  nh[j*(ntime1) + t] = 0;
 //	  if(t==1) Si_iter[j*ntime1 + t] = 1;
@@ -350,7 +349,7 @@ void informed_ar1_sppm(int *draws, int *burn, int *thin,
 	
   for(i = 0; i < *draws; i++){
 
-    if((i+1) % 1000 == 0){
+    if((i+1) % 5000 == 0){
 	  time_t now;
 	  time(&now);
 
@@ -360,6 +359,8 @@ void informed_ar1_sppm(int *draws, int *burn, int *thin,
 //	  RprintVecAsMat("alpha_iter", alpha_iter, 1, *ntime);
 
 	}
+	
+	
 
 //	Rprintf("*ntime = %d\n", *ntime);
 
@@ -1116,8 +1117,6 @@ void informed_ar1_sppm(int *draws, int *burn, int *thin,
 
 
 
-
-
       for(k = 0; k < nclus_iter[t]; k++){
 
 //	    Rprintf("sumy = %f\n", sumy);
@@ -1138,8 +1137,10 @@ void informed_ar1_sppm(int *draws, int *burn, int *thin,
 		      sumy = sumy + y[j*(*ntime)+t];
 		    }
 		  }
+
 		  s2star = 1/((double) nh[k*(ntime1)+t]/sig2h[k*(ntime1) + t] + 1/tau2_iter[t]);
 		  mstar = s2star*( (1/sig2h[k*(ntime1) + t])*sumy + (1/tau2_iter[t])*theta_iter[t]);
+
         }
 		if(t > 1){
 
@@ -1163,6 +1164,7 @@ void informed_ar1_sppm(int *draws, int *burn, int *thin,
 //		Rprintf("sqrt(s2star) = %f\n", sqrt(s2star));
 		muh[k*(ntime1) + t] = rnorm(mstar, sqrt(s2star));
 
+//		Rprintf("muh[k*(ntime1) + t] = %f\n", muh[k*(ntime1) + t]);
 //		RprintVecAsMat("muh", muh, *nsubject, ntime1);
 
 		///////////////////////////////////////////
@@ -1202,8 +1204,12 @@ void informed_ar1_sppm(int *draws, int *burn, int *thin,
 //	      Rprintf("ms = %f\n", ms);
 //		  Rprintf("osig = %f\n", osig);
 //		  Rprintf("nsig = %f\n", nsig);
+
+
 		  llo = llo + dunif(osig, 0.0, Asig, 1);
 		  lln = lln + dunif(nsig, 0.0, Asig, 1);
+//		  llo = llo + dgamma(osig*osig, 10, 0.1, 1);
+//		  lln = lln + dgamma(nsig*nsig, 10, 0.1, 1);
 				
 //		  Rprintf("llo = %f\n", llo);
 //		  Rprintf("lln = %f\n", lln);
@@ -1220,99 +1226,101 @@ void informed_ar1_sppm(int *draws, int *burn, int *thin,
 
 //		  sig2h[k*(ntime1) + t] = 1.0;
 
-        }	
+        }
+      }	
+      
+      
 
-		//////////////////////////////////////////////////////////////////////////////
-		//																		    //
-		// update theta (mean of mh)												//
-		//																		    //
-		//////////////////////////////////////////////////////////////////////////////
-		summu = 0.0;
-		for(k = 0; k < nclus_iter[t]; k++){
-		  summu = summu + muh[k*(ntime1) + t];
-//		  Rprintf("nh[k*(ntime1)+t] = %d\n",  nh[k*(ntime1)+t]);
-	    }
-//		Rprintf("summu = %f\n", summu);
-//		Rprintf("nclus_iter[t] = %d\n",  nclus_iter[t]);
+	  //////////////////////////////////////////////////////////////////////////////
+	  //																		  //
+	  // update theta (mean of mh)												  //
+	  //																		  //
+	  //////////////////////////////////////////////////////////////////////////////
+	  summu = 0.0;
+	  for(k = 0; k < nclus_iter[t]; k++){
+		summu = summu + muh[k*(ntime1) + t];
+//		Rprintf("nh[k*(ntime1)+t] = %d\n",  nh[k*(ntime1)+t]);
+	  }
+//	  Rprintf("summu = %f\n", summu);
+//	  Rprintf("nclus_iter[t] = %d\n",  nclus_iter[t]);
 			
-	    phi1sq = phi1_iter*phi1_iter;
-	    lam2tmp = lam2_iter*(1.0 - phi1sq);
+	  phi1sq = phi1_iter*phi1_iter;
+	  lam2tmp = lam2_iter*(1.0 - phi1sq);
 			
-	    if(t==1){
-//		  Rprintf("t = %d\n", t);
+	  if(t==1){
+//	    Rprintf("t = %d\n", t);
 
-		  s2star = 1.0/((double) nclus_iter[t]/tau2_iter[t] + 1.0/lam2_iter + phi1sq/lam2tmp);
-		  mstar = s2star*( (1.0/tau2_iter[t])*summu + 
-				           (1.0/lam2_iter)*phi0_iter + 
-				           (1.0/lam2tmp)*phi1_iter*(theta_iter[t+1]-phi0_iter*(1-phi1_iter)));
-
-//		  Rprintf("mstar = %f\n", mstar);
-//		  Rprintf("sqrt(s2star) = %f\n", sqrt(s2star));
-			
-		} else if(t==(*ntime-1)){
-			
-//		  Rprintf("t = %d\n", t);
-	      s2star = 1.0/((double) nclus_iter[t]/tau2_iter[t] + 1.0/lam2tmp);
-	      mstar = s2star*((1.0/tau2_iter[t])*summu + 
-				          (1.0/lam2tmp)*(phi0_iter*(1-phi1_iter) + phi1_iter*theta_iter[t-1]));
-//		  Rprintf("mstar = %f\n", mstar);
-//		  Rprintf("sqrt(s2star) = %f\n", sqrt(s2star));
-			
-	    } else {
-
-	      s2star = 1.0/((double) nclus_iter[t]/tau2_iter[t] + (1.0 + phi1sq)/lam2tmp);
-		  mstar = s2star*( (1.0/tau2_iter[t])*summu + 
-				           (1.0/lam2tmp)*(phi1_iter*(theta_iter[t-1] + theta_iter[t+1]) + 
-				                            phi0_iter*(1.0 - phi1_iter)*(1.0 - phi1_iter)));
-
-	    }
+		s2star = 1.0/((double) nclus_iter[t]/tau2_iter[t] + 1.0/lam2_iter + phi1sq/lam2tmp);
+		mstar = s2star*( (1.0/tau2_iter[t])*summu + 
+				         (1.0/lam2_iter)*phi0_iter + 
+				         (1.0/lam2tmp)*phi1_iter*(theta_iter[t+1]-phi0_iter*(1-phi1_iter)));
 
 //		Rprintf("mstar = %f\n", mstar);
 //		Rprintf("sqrt(s2star) = %f\n", sqrt(s2star));
+			
+	  } else if(t==(*ntime-1)){
+			
+//	    Rprintf("t = %d\n", t);
+	    s2star = 1.0/((double) nclus_iter[t]/tau2_iter[t] + 1.0/lam2tmp);
+	    mstar = s2star*((1.0/tau2_iter[t])*summu + 
+				          (1.0/lam2tmp)*(phi0_iter*(1-phi1_iter) + phi1_iter*theta_iter[t-1]));
+//		Rprintf("mstar = %f\n", mstar);
+//		Rprintf("sqrt(s2star) = %f\n", sqrt(s2star));
+			
+	  } else {
+
+	    s2star = 1.0/((double) nclus_iter[t]/tau2_iter[t] + (1.0 + phi1sq)/lam2tmp);
+		mstar = s2star*( (1.0/tau2_iter[t])*summu + 
+				         (1.0/lam2tmp)*(phi1_iter*(theta_iter[t-1] + theta_iter[t+1]) + 
+				                            phi0_iter*(1.0 - phi1_iter)*(1.0 - phi1_iter)));
+
+	  }
+
+//	  Rprintf("mstar = %f\n", mstar);
+//	  Rprintf("sqrt(s2star) = %f\n", sqrt(s2star));
 		
-	    theta_iter[t] = rnorm(mstar, sqrt(s2star));
+	  theta_iter[t] = rnorm(mstar, sqrt(s2star));
 
-//		Rprintf("theta_iter = %f\n", theta_iter[t]);
+//	  Rprintf("theta_iter = %f\n", theta_iter[t]);
 
-		//////////////////////////////////////////////////////////////////////////////
-		//																			//
-		// update tau2 (variance of mh)												//
-		//																			//
-		//////////////////////////////////////////////////////////////////////////////
-		ot = sqrt(tau2_iter[t]);
-		nt = rnorm(ot,csigTAU);
+	  //////////////////////////////////////////////////////////////////////////////
+	  //																		  //
+	  // update tau2 (variance of mh)											  //
+	  //																		  //
+	  //////////////////////////////////////////////////////////////////////////////
+	  ot = sqrt(tau2_iter[t]);
+	  nt = rnorm(ot,csigTAU);
 
-		if(nt > 0){		
+	  if(nt > 0){		
 				
-		  lln = 0.0;
-		  llo = 0.0;	
-		  for(k = 0; k < nclus_iter[t]; k++){
-		    llo = llo + dnorm(muh[k*(ntime1) + t], theta_iter[t], ot,1);
-		    lln = lln + dnorm(muh[k*(ntime1) + t], theta_iter[t], nt,1);
-		  }
+	    lln = 0.0;
+	    llo = 0.0;	
+	    for(k = 0; k < nclus_iter[t]; k++){
+		  llo = llo + dnorm(muh[k*(ntime1) + t], theta_iter[t], ot,1);
+		  lln = lln + dnorm(muh[k*(ntime1) + t], theta_iter[t], nt,1);
+		}
 				
-//		  Rprintf("ms = %f\n", ms);
-//		  Rprintf("osig = %f\n", osig);
-//		  Rprintf("nsig = %f\n", nsig);
-		  llo = llo + dunif(ot, 0.0, Atau, 1);
-		  lln = lln + dunif(nt, 0.0, Atau, 1);
+//		Rprintf("ms = %f\n", ms);
+//		Rprintf("osig = %f\n", osig);
+//		Rprintf("nsig = %f\n", nsig);
+	    llo = llo + dunif(ot, 0.0, Atau, 1);
+		lln = lln + dunif(nt, 0.0, Atau, 1);
 				
 				
-//		  Rprintf("llo = %f\n", llo);
-//		  Rprintf("lln = %f\n", lln);
+//		Rprintf("llo = %f\n", llo);
+//		Rprintf("lln = %f\n", lln);
 	
-		  llr = lln - llo;
-		  uu = runif(0,1);
+		llr = lln - llo;
+		uu = runif(0,1);
 
-//		  Rprintf("llr = %f\n", llr);
-//		  Rprintf("log(uu) = %f\n", log(uu));
+//		Rprintf("llr = %f\n", llr);
+//		Rprintf("log(uu) = %f\n", log(uu));
 				
-		  if(log(uu) < llr){
-		    tau2_iter[t] = nt*nt;					
-//			tau2_iter[t] = 5*5;
-		  }
-	    }	
-      }
+		if(log(uu) < llr){
+		  tau2_iter[t] = nt*nt;					
+//		  tau2_iter[t] = 5*5;
+		}
+	  }	
     }            
 //	Rprintf("tau2_iter = %f\n", tau2_iter[t]);
 
@@ -1651,6 +1659,7 @@ void informed_ar1_sppm(int *draws, int *burn, int *thin,
     		}
     	}	
 */ 
+
 
    
     ////////////////////////////////////////////////////////////////////////////////////////////

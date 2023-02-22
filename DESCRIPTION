@@ -1,7 +1,7 @@
 Package: drpm
 Type: Package
 Title: Dependent Random Partition Model
-Version: 0.1.1
+Version: 0.1.2
 Authors@R: person(given = "Garritt", family = "L. Page", email = "page@stat.byu.edu", role = c("aut", "cre", "cph"))
 Maintainer: Garritt L. Page <page@stat.byu.edu>
 Description: Provides an R-wrapper function that access C-code that fits models that employ a 
