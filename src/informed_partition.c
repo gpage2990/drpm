@@ -131,7 +131,7 @@ void informed_ar1_sppm(int *draws, int *burn, int *thin,
   // things on time boundary do not need special attention in the algorithm since
   // I have to look at time period before and after when updating partitions
   int ntime1 = *ntime + 1;
-
+  Rprintf("ntime = %d\n", *ntime);
   // I am adding one more year as an empty vector
   // so that the C program does not crash.
   int gamma_iter[(*nsubject)*(ntime1)];
@@ -142,9 +142,9 @@ void informed_ar1_sppm(int *draws, int *burn, int *thin,
   double *theta_iter = R_VectorInit(ntime1, rnorm(0,3));
   double *tau2_iter = R_VectorInit(ntime1, runif(0, modelPriors[3]*modelPriors[3]));
 
-  double phi0_iter = rnorm(0,3);
-  double phi1_iter = runif(0,1); if(update_eta1==0) phi1_iter = 0;
-  double lam2_iter = runif(0, modelPriors[4]*modelPriors[4]);
+  double phi0_iter = rnorm(0,3); if(*ntime==2) phi0_iter=modelPriors[0];
+  double phi1_iter = runif(0,1); if(*update_phi1==0) phi1_iter = 0;
+  double lam2_iter = runif(0, modelPriors[4]*modelPriors[4]); if(*ntime==2) lam2_iter=modelPriors[1];
 
   double *alpha_iter = R_VectorInit((*nsubject)*(ntime1), *alpha);	
   // ===================================================================================
@@ -1444,85 +1444,88 @@ void informed_ar1_sppm(int *draws, int *burn, int *thin,
 //	RprintVecAsMat("alpha_iter", alpha_iter, *nsubject, ntime1);
 	
 
-    //////////////////////////////////////////////////////////////////////////////
-    //																			//
-    // update phi0																//
-    //																			//
-    //////////////////////////////////////////////////////////////////////////////
-    phi1sq = phi1_iter*phi1_iter;
-    one_phisq = (1-phi1_iter)*(1-phi1_iter);
-    lam2tmp = lam2_iter*(1.0 - phi1sq);
+    if(*ntime>2){
+
+      //////////////////////////////////////////////////////////////////////////////
+      //																			//
+      // update phi0																//
+      //																			//
+      //////////////////////////////////////////////////////////////////////////////
+      phi1sq = phi1_iter*phi1_iter;
+      one_phisq = (1-phi1_iter)*(1-phi1_iter);
+      lam2tmp = lam2_iter*(1.0 - phi1sq);
  
-    sumt = 0.0;
-    for(t=2; t<*ntime; t++){
-      sumt = sumt + (theta_iter[t] - phi1_iter*theta_iter[t-1]);		
-    }
-    	
-    s2star = 1.0/((*ntime-1)*(one_phisq/lam2tmp) + (1/lam2_iter) + (1/s20));
-    mstar = s2star*(((1.0-phi1_iter)/lam2tmp)*sumt + (1/lam2_iter)*theta_iter[0] + (1/s20)*m0);
-    	
-    phi0_iter = rnorm(mstar, sqrt(s2star));
-    
-    
-    //////////////////////////////////////////////////////////////////////////////
-    //																			//
-    // update phi1																//
-    //																			//
-    //////////////////////////////////////////////////////////////////////////////
-    	
-    if(*update_phi1==1){
-      op1 = phi1_iter;
-      np1 = rnorm(op1, csigPHI1);
-    	
-      if(np1 > -1 & np1 < 1){
-        llo = 0.0, lln = 0.0;
-    	for(t=2; t < *ntime; t++){// Note that we are starting at ts + 1 since ts is the first time point
-    
-    	  llo = llo + dnorm(theta_iter[t], phi0_iter*(1-op1) + op1*theta_iter[t-1], 
-    			    	                             sqrt(lam2_iter*(1.0 - op1*op1)), 1);
-    	  lln = lln + dnorm(theta_iter[t], phi0_iter*(1-np1) + np1*theta_iter[t-1], 
-    				                                 sqrt(lam2_iter*(1.0 - np1*np1)), 1);
-    	}
-    	  
-    	llo = llo + dunif(op1, -1,1, 1);
-    	lln = lln + dunif(np1, -1,1, 1);
-    		
-    	llr = lln - llo;
-    	if(llr > log(runif(0,1))) phi1_iter = np1;
-      }
-    }	
-    
-    //////////////////////////////////////////////////////////////////////////////
-    //																			//
-    // update lam2																//
-    //																			//
-    //////////////////////////////////////////////////////////////////////////////
-    
-    // Update lambda with a MH step
-    phi1sq = phi1_iter*phi1_iter;
-    
-    ol = sqrt(lam2_iter);
-    nl = rnorm(ol, csigLAM);
-    if(nl > 0.0){
-      lln = 0.0;
-      llo = 0.0;
+      sumt = 0.0;
       for(t=2; t<*ntime; t++){
-        llo = llo + dnorm(theta_iter[t],
-    			                  phi0_iter*(1-phi1_iter) + phi1_iter*theta_iter[t-1], ol*sqrt(1-phi1sq),1);
-    	lln = lln + dnorm(theta_iter[t],
-    			                  phi0_iter*(1-phi1_iter) + phi1_iter*theta_iter[t-1], nl*sqrt(1-phi1sq),1);
+        sumt = sumt + (theta_iter[t] - phi1_iter*theta_iter[t-1]);		
       }
-      llo = llo + dnorm(theta_iter[0], phi0_iter, ol, 1) + dunif(ol, 0.0, Alam, 1);
-      lln = lln + dnorm(theta_iter[0], phi0_iter, nl, 1) + dunif(nl, 0.0, Alam, 1);
+    	
+      s2star = 1.0/((*ntime-1)*(one_phisq/lam2tmp) + (1/lam2_iter) + (1/s20));
+      mstar = s2star*(((1.0-phi1_iter)/lam2tmp)*sumt + (1/lam2_iter)*theta_iter[0] + (1/s20)*m0);
+    	
+      phi0_iter = rnorm(mstar, sqrt(s2star));
     
-      llr = lln - llo;
-      uu = runif(0,1);
+
     
-      if(log(uu) < llr){
-        lam2_iter = nl*nl;
+      //////////////////////////////////////////////////////////////////////////////
+      //																			//
+      // update phi1																//
+      //																			//
+      //////////////////////////////////////////////////////////////////////////////
+    	
+      if(*update_phi1==1){
+        op1 = phi1_iter;
+        np1 = rnorm(op1, csigPHI1);
+    	
+        if(np1 > -1 & np1 < 1){
+          llo = 0.0, lln = 0.0;
+    	  for(t=2; t < *ntime; t++){// Note that we are starting at ts + 1 since ts is the first time point
+    
+    	    llo = llo + dnorm(theta_iter[t], phi0_iter*(1-op1) + op1*theta_iter[t-1], 
+    		 	    	                             sqrt(lam2_iter*(1.0 - op1*op1)), 1);
+    	    lln = lln + dnorm(theta_iter[t], phi0_iter*(1-np1) + np1*theta_iter[t-1], 
+    				                                 sqrt(lam2_iter*(1.0 - np1*np1)), 1);
+    	  }
+    	  
+    	  llo = llo + dunif(op1, -1,1, 1);
+    	  lln = lln + dunif(np1, -1,1, 1);
+    		
+    	  llr = lln - llo;
+    	  if(llr > log(runif(0,1))) phi1_iter = np1;
+        }
+      }	
+    
+      //////////////////////////////////////////////////////////////////////////////
+      //																			//
+      // update lam2																//
+      //																			//
+      //////////////////////////////////////////////////////////////////////////////
+    
+      // Update lambda with a MH step
+      phi1sq = phi1_iter*phi1_iter;
+    
+      ol = sqrt(lam2_iter);
+      nl = rnorm(ol, csigLAM);
+      if(nl > 0.0){
+        lln = 0.0;
+        llo = 0.0;
+        for(t=2; t<*ntime; t++){
+          llo = llo + dnorm(theta_iter[t],
+    			                  phi0_iter*(1-phi1_iter) + phi1_iter*theta_iter[t-1], ol*sqrt(1-phi1sq),1);
+    	  lln = lln + dnorm(theta_iter[t],
+    			                  phi0_iter*(1-phi1_iter) + phi1_iter*theta_iter[t-1], nl*sqrt(1-phi1sq),1);
+        }
+        llo = llo + dnorm(theta_iter[0], phi0_iter, ol, 1) + dunif(ol, 0.0, Alam, 1);
+        lln = lln + dnorm(theta_iter[0], phi0_iter, nl, 1) + dunif(nl, 0.0, Alam, 1);
+    
+        llr = lln - llo;
+        uu = runif(0,1);
+    
+        if(log(uu) < llr){
+          lam2_iter = nl*nl;
+        }
       }
     }
-    
     
 /*    
     phi1sq = phi1_iter*phi1_iter;

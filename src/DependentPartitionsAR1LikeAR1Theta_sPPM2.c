@@ -1607,7 +1607,7 @@ void drpm_ar1_sppm(int *draws, int *burn, int *thin, int *nsubject, int *ntime,
 		//																			//
 		//////////////////////////////////////////////////////////////////////////////
 		if(*update_alpha == 1){
-			if(*time_specific_alpha == 1){
+			if(*time_specific_alpha != 1){
 				sumg = 0;
 				for(j = 0; j < *nsubject; j++){
 					for(t = 1; t < *ntime; t++){
