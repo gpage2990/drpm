@@ -230,7 +230,7 @@ void mcmc_drpm_areg(int *draws, int *burn, int *thin, int *nsubject, int *ntime,
 	double e1o, e1n;
 
 	// stuff I need to update muh and sig2h
-	double mstar, s2star, sumy, sume2;
+	double mstar, s2star, sumy; //sume2;
 	double nsig, osig, llo, lln, llr;
 	double *mu_tmp = R_VectorInit(*nsubject, 0.0);
 	double *sig2_tmp = R_VectorInit(*nsubject, 1.0);
@@ -1262,7 +1262,7 @@ void mcmc_drpm_areg(int *draws, int *burn, int *thin, int *nsubject, int *ntime,
 				if(t > 0){
 
 					sumy = 0.0;
-					sume2 = 0.0;
+					//sume2 = 0.0;
 					for(j = 0; j < *nsubject; j++){
 						if(Si_iter[j*(ntime1) + t] == k+1){
 							sumy = sumy + (y[j*(*ntime)+t] - eta1_iter[j]*y[j*(*ntime)+t-1]);

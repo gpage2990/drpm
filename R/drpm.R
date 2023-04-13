@@ -18,6 +18,8 @@ drpm_fit <- function(y,s_coords=NULL,
 					           phi1_0=FALSE, # TRUE means that phi1 = 0 not updated
 					           modelPriors=c(0,100^2,1,1,1,1),
 					           alphaPriors=rbind(c(1,1)),  # I need to add this to the DRPM AR1 SPPM function
+					           simpleModel = 0, # if 1 then simple model in Sally's simulation.
+					           theta_tau2 =c(0, 2), # this is only used if simpleModel = 1
 					           SpatialCohesion=4,
 					           cParms=c(0, 1, 2, 1),
 					           mh=c(0.5, 1, 0.1, 0.1, 0.1),
@@ -94,6 +96,7 @@ drpm_fit <- function(y,s_coords=NULL,
 	              as.integer(update_alpha), as.integer(update_eta1), as.integer(update_phi1),
 	              as.integer(sPPM), as.integer(SpatialCohesion), as.double(cParms),
 	              as.double(mh), as.integer(space_1),
+	              as.integer(simpleModel), as.double(theta_tau2),
 	              Si.draws = as.integer(Si),mu.draws = as.double(mu),
 	              sig2.draws = as.double(sig2), eta1.draws = as.double(eta1),
 	              theta.draws = as.double(theta), tau2.draws = as.double(tau2),
@@ -152,6 +155,24 @@ drpm_fit <- function(y,s_coords=NULL,
   out$waic <- C.out$waic.out
 
   out$initial_partition = initial_partition
+
+  if(simpleModel==1){
+    out <- NULL
+    out$Si <- array(C.out$Si.draws, c(ntime,nsubject,nout))[1:ntime_out,,,drop=FALSE]
+    out$gamma <- array(C.out$gamma.draws, c(ntime,nsubject,nout))[1:ntime_out,,,drop=FALSE]
+    if(unit_specific_alpha) out$alpha <- array(C.out$alpha, c(ntime,nsubject,nout))[1:ntime_out,,,drop=FALSE]
+    if(!unit_specific_alpha) out$alpha <- matrix(C.out$alpha.draws,nrow=nout, byrow=TRUE)[,1:ntime_out,drop=FALSE]
+    out$mu <- array(C.out$mu.draws, c(ntime,nsubject,nout))[1:ntime_out,,,drop=FALSE]
+    out$sig2 <- 1
+    out$theta <- theta_tau2[1]
+    out$tau2 <- theta_tau2[2]
+    out$llike <- array(C.out$llike.draws, c(ntime,nsubject,nout))[1:ntime_out,,,drop=FALSE]
+    out$fitted <- array(C.out$fitted.draws, c(ntime,nsubject,nout))[1:ntime_out,,,drop=FALSE]
+    out$lpml <- C.out$lpml.out
+    out$waic <- C.out$waic.out
+    out$initial_partition = initial_partition
+
+  }
 
   out
 

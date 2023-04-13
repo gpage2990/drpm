@@ -879,10 +879,10 @@ int compatibility(int *rho1, int *rho2, int n){
  * 		0 - not compatible
  * 		1 - compatible
  *******************************************************************************/
-	int i, nc1, nc2, comp=1, scr1[n], scr2[n], scr3[n], scr4[n];
-
-	nc1 = unique_elements(rho1, n);
-	nc2 = unique_elements(rho2, n);
+	int i,  comp=1, scr1[n], scr2[n], scr3[n], scr4[n];
+    // int nc1, nc2;
+	//nc1 = unique_elements(rho1, n);
+	//nc2 = unique_elements(rho2, n);
 
 //	Rprintf("nc1 = %d\n", nc1);
 //	Rprintf("nc2 = %d\n", nc2);
@@ -995,9 +995,10 @@ double gsimconNN(double m0, double v2, double s20, double sumx, double sumx2, do
 //	Rprintf("n = %d\n", n);
 
 	double mus, muss, s2s, s2ss;
-	double ld1, ld2, ld3, ld4, ld5, ld6;
+	double ld1, ld2, ld3, ld4, ld5;
+	//double ld6;
 	double out;
-	double out1, out2;
+	// double out1, out2;
 
 	s2s = 1/((n/v2) + (1/s20));
 	mus = s2s*((1/v2)*sumx + (1/s20)*m0);
@@ -1017,7 +1018,7 @@ double gsimconNN(double m0, double v2, double s20, double sumx, double sumx2, do
 	ld4 = dnorm(muss, 0, sqrt(s2ss),1);
 
 	ld5 = dnorm(mle, m0, sqrt(s20),1);
-	ld6 = dnorm(mle, mus, sqrt(s2s),1);
+	// ld6 = dnorm(mle, mus, sqrt(s2s),1);
 //	Rprintf("ld1 = %f\n", ld1);
 //	Rprintf("ld2 = %f\n", ld2);
 //	Rprintf("ld3 = %f\n", ld3);
@@ -1025,8 +1026,8 @@ double gsimconNN(double m0, double v2, double s20, double sumx, double sumx2, do
 
 
 	out = ld1 + ld2 - ld3;
-	out1 = ld1 + ld3 - ld4;
-	out2 = ld5 - ld6;
+	//out1 = ld1 + ld3 - ld4;
+	//out2 = ld5 - ld6;
 //	Rprintf("out = %f\n", out);
 //	Rprintf("out1 = %f\n", out1);
 	if(DD==1) out = ld1 + ld3 - ld4;
@@ -1502,7 +1503,8 @@ double Cohesion3_4(double *s1, double *s2, double *mu0, double k0, double v0, do
 	int ii;
 	double kn,knn,vn,vnn,out,sbar1,sbar2,dL0,dLn,dLnn;
 	double s_sbar1,s_sbar2;
-	double sbar_mu01, sbar_mu02, sbar_mun1, sbar_mun2, mun1, mun2, munn1, munn2;
+	double sbar_mu01, sbar_mu02, sbar_mun1, sbar_mun2, mun1, mun2; 
+	// double munn1, munn2;
 	double Vs1, Vs2, Vs3, Vs4;
 	double Vsbarmu01, Vsbarmu02, Vsbarmu03, Vsbarmu04;
 	double Vsbarmun1, Vsbarmun2, Vsbarmun3, Vsbarmun4;
@@ -1543,8 +1545,8 @@ double Cohesion3_4(double *s1, double *s2, double *mu0, double k0, double v0, do
 
 	mun1 = k0/(k0+dim)*mu0[0] + dim/(k0+dim)*sbar1;
 	mun2 = k0/(k0+dim)*mu0[1] + dim/(k0+dim)*sbar2;
-	munn1 = kn/(kn+dim)*mun1 + dim/(kn+dim)*sbar1;
-	munn2 = kn/(kn+dim)*mun2 + dim/(kn+dim)*sbar2;
+	//munn1 = kn/(kn+dim)*mun1 + dim/(kn+dim)*sbar1;
+	//munn2 = kn/(kn+dim)*mun2 + dim/(kn+dim)*sbar2;
 
 
 	sbar_mu01 = sbar1 - mu0[0];

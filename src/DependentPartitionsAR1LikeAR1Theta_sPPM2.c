@@ -203,7 +203,8 @@ void drpm_ar1_sppm(int *draws, int *burn, int *thin, int *nsubject, int *ntime,
 	int nh_redtmp[*nsubject], nh_tmp[*nsubject];
 	int nh_redtmp_no_zero[*nsubject], nh_tmp_no_zero[*nsubject],nh_red_no_zero[*nsubject];
 
-	int nh_red_1[*nsubject], nclus_red_1;
+	int nh_red_1[*nsubject];
+	// int nclus_red_1;
 	int nh_redtmp_1[*nsubject], nh_tmp_1[*nsubject];
 	int nh_redtmp_no_zero_1[*nsubject], nh_red_no_zero_1[*nsubject],nh_tmp_no_zero_1[*nsubject];
 	double *s1_red = R_VectorInit(*nsubject, 0.0);
@@ -248,7 +249,8 @@ void drpm_ar1_sppm(int *draws, int *burn, int *thin, int *nsubject, int *ntime,
 	double *sig2_tmp = R_VectorInit(*nsubject, 1.0);
 	
 	// stuff that I need for theta and lam2
-	double summu, nt, ot, lam2tmp, phi1sq, sumt, op1, np1, ssq, ol, nl;
+	double summu, nt, ot, lam2tmp, phi1sq, sumt, op1, np1, ol, nl;
+//	double ssq;
 	
 	// stuff that I need to update alpha
 	int sumg;
@@ -264,7 +266,7 @@ void drpm_ar1_sppm(int *draws, int *burn, int *thin, int *nsubject, int *ntime,
 	double *mnllike = R_VectorInit((*nsubject)*(ntime1), 0.0);
 
 	// stuff to predict
-	int gpred[*nsubject], nh_pred[*nsubject];
+	// int gpred[*nsubject], nh_pred[*nsubject];
 
 
 	// ===================================================================================		
@@ -452,9 +454,9 @@ void drpm_ar1_sppm(int *draws, int *burn, int *thin, int *nsubject, int *ntime,
 					nh_red_1[Si_red_1[n_red]-1]= nh_red_1[Si_red_1[n_red]-1] + 1;			
 					// this may need to be updated depending on if the value of gamma changes
 
-					nclus_red_1 = nclus_red;
+					//nclus_red_1 = nclus_red;
 
-					if(Si_red_1[n_red] > nclus_red) nclus_red_1 = Si_red_1[n_red]; 
+					//if(Si_red_1[n_red] > nclus_red) nclus_red_1 = Si_red_1[n_red]; 
 
 //					Rprintf("nclus_red = %d\n", nclus_red);
 //					Rprintf("nclus_red_1 = %d\n", nclus_red_1);

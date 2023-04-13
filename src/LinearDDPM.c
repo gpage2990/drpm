@@ -203,7 +203,8 @@ void LDDP(int *draws, int *burn, int *thin, int *nobs, int *ncov,
 
 
 	// stuff I need to update sig2h (player specific), beta0, Sig20;
-	double astar, bstar, ld, lln, llo, llr;
+	double astar, bstar, ld;
+	// double lln, llo, llr;
 
 	
 	// stuff I need to update betah, beta0
@@ -263,8 +264,8 @@ void LDDP(int *draws, int *burn, int *thin, int *nobs, int *ncov,
 //	Rprintf("nu0 = %f\n", nu0);
 
 	// prior values for sigh
-	double A=priorparms[4];
-	double A0 = 0.0;
+//	double A=priorparms[4];
+//	double A0 = 0.0;
 //	Rprintf("A = %f\n", A);
 
 	double asig=1.0, bsig=1.0;

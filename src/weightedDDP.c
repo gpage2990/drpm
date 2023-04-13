@@ -50,7 +50,7 @@ void WDDP(int *draws, int *burn, int *thin, int *nobs, int *dim, int *N,
 	
 
 
-    int i, j, t, tt, d, ii, T, h;
+    int i, j, t, tt, d, ii, h;
 	int ncp=(*dim)*(*dim);
 	int df;
 	
@@ -63,7 +63,7 @@ void WDDP(int *draws, int *burn, int *thin, int *nobs, int *dim, int *N,
 
 	double uu, ld;
 
-	T = (*nobs)*(*dim);//Total number of observations
+	//int T = (*nobs)*(*dim);//Total number of observations
 	
 
 	double alpha;
@@ -81,7 +81,7 @@ void WDDP(int *draws, int *burn, int *thin, int *nobs, int *dim, int *N,
 	// ===================================================================================
 	int Si_iter[*nobs]; for(j=0; j<*nobs; j++) Si_iter[j]=rbinom(2 , 0.5) + 1;
 //    RprintIVecAsMat("Si_iter", Si_iter, 1, *nobs);
-	int nclus_iter; 
+	int nclus_iter=1, sumnh=0; 
 
 	double *mu_iter = R_VectorInit((*N)*(*dim), 0.0);
 	double *mu0_iter = R_VectorInit((*N)*(*dim), 0.0);
@@ -476,8 +476,16 @@ void WDDP(int *draws, int *burn, int *thin, int *nobs, int *dim, int *N,
 		}
 //	    Rprintf("Si_iter[j] = %d\n", Si_iter[j]);
       }
-//      RprintIVecAsMat("Si_iter", Si_iter, 1, *nobs);
       
+//      RprintIVecAsMat("Si_iter", Si_iter, 1, *nobs);
+      nclus_iter = 1;
+      for(h = 0; h < *N; h++){
+        sumnh = 0;
+        for(j = 0; j < *nobs; j++){
+          if(Si_iter[j] == h+1) sumnh = sumnh+1;
+        }
+        if(sumnh > 0) nclus_iter = nclus_iter + 1;
+      }
       /************************************************************************** 
        *                                                                        *
        *  Next I update the stick-breaking weights.  These are draws from a     *

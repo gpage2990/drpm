@@ -14,6 +14,8 @@ drpm_fit(y,
          phi1_0=FALSE,
          modelPriors=c(0,100^2,1,1,1,1),
          alphaPriors=rbind(c(1,1)),
+         simpleModel = 0,
+         theta_tau2 =c(0, 2),
          SpatialCohesion=4,
          cParms=c(0, 1, 2, 1),
          mh=c(0.5, 1, 0.1, 0.1, 0.1),
@@ -59,6 +61,9 @@ drpm_fit(y,
 }
 \item{alphaPriors}{Matrix containing beta prior values for the alpha parameters.  The columns correspond to the 1st and 2nd shape beta shape parameters.  The number of rows corresponds to the number of units.  If no initial partition is supplied then only the first row is used.
 }
+\item{simpleModel}{If 1 then the simple model in Sally's simulation is employed.}
+
+\item{theta_tau2}{Only used if simpleModel=1.  This is a two-dimensional vector with the first entry corresponding to the value that is fixed to theta and the second to tau2}
 
 \item{SpatialCohesion}{Scalar indicating what cohesion to use if spatial coordinates are provided
 \itemize{

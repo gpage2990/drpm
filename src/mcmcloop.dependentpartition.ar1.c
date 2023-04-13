@@ -247,7 +247,7 @@ void mcmc_drpm_ar1(int *draws, int *burn, int *thin, int *nsubject, int *ntime,
 	double astar, bstar,alpha_tmp;
 
 	// Stuff to compute lpml, likelihood, and WAIC
-	int like0, nout_0=0;
+	// int like0, nout_0=0;
 	double lpml_iter, elppdWAIC;
 	double *CPO = R_VectorInit((*nsubject)*(ntime1), 0.0);
 	double *like_iter = R_VectorInit((*nsubject)*(ntime1), 0.0);
@@ -1853,7 +1853,7 @@ void mcmc_drpm_ar1(int *draws, int *burn, int *thin, int *nsubject, int *ntime,
 		////////////////////////////////////////////////////////////////////////////////////////////
 		if((i > (*burn-1)) & ((i+1)  % (*thin) == 0)){
 
-			like0=0;
+			//like0=0;
 			for(j = 0; j < *nsubject; j++){
 //				Rprintf("j = %d\n", j);
 				for(t = 0; t < *ntime; t++){

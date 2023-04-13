@@ -74,7 +74,7 @@ void informed_ar1_sppm(int *draws, int *burn, int *thin,
 			  int *time_specific_alpha, int *unit_specific_alpha,
 			  int *update_alpha, int *update_eta1, int *update_phi1, 
 			  int *sPPM, int *SpatialCohesion, double *cParms, double *mh,
-			  int *space_1,
+			  int *space_1, int *simpleModel, double *theta_tau2,
 			  int *Si, double *mu, double *sig2, double *eta1, double *theta, double *tau2, 
 			  double *phi0, double *phi1, double *lam2, int *gamma, double *alpha_out, 
 			  double *fitted, double *llike, double *lpml, double *waic){
@@ -91,7 +91,7 @@ void informed_ar1_sppm(int *draws, int *burn, int *thin,
   // kk - second cluster iterate
   // p - prediction iterate
   // ts - indicator of t iterate depending on if centering partition is supplied. 	
-  int i, ii, j, jj, t, k, kk, ts;
+  int i, ii, j, jj, t, k, kk;
   ii = 0;
 	
   int nout = (*draws - *burn)/(*thin);
@@ -106,9 +106,8 @@ void informed_ar1_sppm(int *draws, int *burn, int *thin,
   
   
   RprintIVecAsMat("cp", centering_partition, 1, *nsubject);
-  int cp = centering_partition[0];
+  // int cp = centering_partition[0];
   
-  Rprintf("cp = %d\n", centering_partition[0]);
   Rprintf("Fitting informed partition model \n");
 	
 
@@ -154,9 +153,14 @@ void informed_ar1_sppm(int *draws, int *burn, int *thin,
   // ===================================================================================
 
   double *muh = R_VectorInit((*nsubject)*(ntime1), 0.0);
-  double *sig2h = R_VectorInit((*nsubject)*(ntime1), 0.5);
+  double *sig2h = R_VectorInit((*nsubject)*(ntime1), 1.0);
 
-
+  if(*simpleModel==1){
+    for(t = 0; t < ntime1; t++){
+      theta_iter[t] = theta_tau2[0];
+      tau2_iter[t] = theta_tau2[1];
+    }
+  }
   int nh[(*nsubject)*(ntime1)];
 
 
@@ -221,7 +225,8 @@ void informed_ar1_sppm(int *draws, int *burn, int *thin,
   int nh_redtmp[*nsubject], nh_tmp[*nsubject];
   int nh_redtmp_no_zero[*nsubject], nh_tmp_no_zero[*nsubject],nh_red_no_zero[*nsubject];
   
-  int nh_red_1[*nsubject], nclus_red_1;
+  int nh_red_1[*nsubject];
+  //int nclus_red_1;
   int nh_redtmp_1[*nsubject], nh_tmp_1[*nsubject];
   int nh_redtmp_no_zero_1[*nsubject], nh_red_no_zero_1[*nsubject],nh_tmp_no_zero_1[*nsubject];
   double *s1_red = R_VectorInit(*nsubject, 0.0);
@@ -266,8 +271,9 @@ void informed_ar1_sppm(int *draws, int *burn, int *thin,
   double *sig2_tmp = R_VectorInit(*nsubject, 1.0);
 	
   // stuff that I need for theta and lam2
-  double summu, nt, ot, lam2tmp, phi1sq, sumt, op1, np1, ssq, ol, nl;
-	
+  double summu, nt, ot, lam2tmp, phi1sq, sumt, op1, np1, ol, nl;
+  // double ssq;
+  	
   // stuff that I need to update alpha
   int sumg;
   double astar, bstar,alpha_tmp;
@@ -282,7 +288,7 @@ void informed_ar1_sppm(int *draws, int *burn, int *thin,
   double *mnllike = R_VectorInit((*nsubject)*(ntime1), 0.0);
 
   // stuff to predict
-  int gpred[*nsubject], nh_pred[*nsubject];
+  // int gpred[*nsubject], nh_pred[*nsubject];
 
 
   // ===================================================================================		
@@ -312,7 +318,7 @@ void informed_ar1_sppm(int *draws, int *burn, int *thin,
 
 
 
-  Rprintf("Prior values: Asig = %.2f, Atau = %.2f, Alam = %.2f, \n \ \ \ \ m0 = %.2f, s20 = %.2f\n\n",
+  Rprintf("Prior values: Asig = %.2f, Atau = %.2f, Alam = %.2f, \n  m0 = %.2f, s20 = %.2f\n\n",
              Asig, Atau, Alam, m0, s20);
 
 
@@ -440,9 +446,9 @@ void informed_ar1_sppm(int *draws, int *burn, int *thin,
         nh_red_1[Si_red_1[n_red]-1]= nh_red_1[Si_red_1[n_red]-1] + 1;			
         // this may need to be updated depending on if the value of gamma changes
         
-        nclus_red_1 = nclus_red;
+        //nclus_red_1 = nclus_red;
         
-        if(Si_red_1[n_red] > nclus_red) nclus_red_1 = Si_red_1[n_red]; 
+        //if(Si_red_1[n_red] > nclus_red) nclus_red_1 = Si_red_1[n_red]; 
         
         
         
@@ -1019,6 +1025,7 @@ void informed_ar1_sppm(int *draws, int *burn, int *thin,
 						
 		    muh[(Si_iter[j*(ntime1) + t]-1)*(ntime1) + t] = mudraw;
 		    sig2h[(Si_iter[j*(ntime1) + t]-1)*(ntime1) + t] = sigdraw*sigdraw;
+		    if(*simpleModel==1) sig2h[(Si_iter[j*(ntime1) + t]-1)*(ntime1) + t] = 1.0;
 
 		  }
 
@@ -1224,7 +1231,7 @@ void informed_ar1_sppm(int *draws, int *burn, int *thin,
 		    sig2h[k*(ntime1) + t] = nsig*nsig;					
 		  }
 
-//		  sig2h[k*(ntime1) + t] = 1.0;
+		  if(*simpleModel==1) sig2h[k*(ntime1) + t] = 1.0;
 
         }
       }	
@@ -1280,6 +1287,7 @@ void informed_ar1_sppm(int *draws, int *burn, int *thin,
 //	  Rprintf("sqrt(s2star) = %f\n", sqrt(s2star));
 		
 	  theta_iter[t] = rnorm(mstar, sqrt(s2star));
+	  if(*simpleModel==1) theta_iter[t] = 0.0;
 
 //	  Rprintf("theta_iter = %f\n", theta_iter[t]);
 
@@ -1318,8 +1326,8 @@ void informed_ar1_sppm(int *draws, int *burn, int *thin,
 				
 		if(log(uu) < llr){
 		  tau2_iter[t] = nt*nt;					
-//		  tau2_iter[t] = 5*5;
 		}
+		if(*simpleModel==1) tau2_iter[t] = theta_tau2[1];
 	  }	
     }            
 //	Rprintf("tau2_iter = %f\n", tau2_iter[t]);
@@ -1375,7 +1383,7 @@ void informed_ar1_sppm(int *draws, int *burn, int *thin,
 //      Rprintf("updating alpha \n");
 //	    RprintIVecAsMat("Si_iter ", Si_iter, *nsubject, ntime1);
 //      RprintIVecAsMat("gamma_iter ", gamma_iter, *nsubject, ntime1);
-	  if(*time_specific_alpha == 0 & *unit_specific_alpha==0){
+	  if(*time_specific_alpha == 0 & *unit_specific_alpha==0){ // global  time and unit
       
 	    sumg = 0;
 	    for(j = 0; j < *nsubject; j++){
@@ -1397,7 +1405,7 @@ void informed_ar1_sppm(int *draws, int *burn, int *thin,
 		for(t=1;t<*ntime;t++){alpha_iter[t] = alpha_tmp;}
 	    alpha_iter[0] = 1.0;
       }
-      if(*time_specific_alpha == 1 & *unit_specific_alpha==0){    
+      if(*time_specific_alpha == 1 & *unit_specific_alpha==0){   // local time and global unit 
 	    for(t = 1; t < *ntime; t++){
 	      sumg = 0;
 		  for(j = 0; j < *nsubject; j++){
@@ -1414,7 +1422,7 @@ void informed_ar1_sppm(int *draws, int *burn, int *thin,
         }
 	    alpha_iter[0] = 1.0;
       } 
-      if(*time_specific_alpha == 0 & *unit_specific_alpha==1){
+      if(*time_specific_alpha == 0 & *unit_specific_alpha==1){ // global time and local unit
         for(j = 0; j < *nsubject; j++){
           sumg = 0;
           for(t = 1; t < *ntime; t++){
@@ -1427,7 +1435,7 @@ void informed_ar1_sppm(int *draws, int *burn, int *thin,
 		  alpha_iter[j*ntime1 + 1] = rbeta(astar, bstar);
         }
 	  }
-      if(*time_specific_alpha == 1 & *unit_specific_alpha==1){
+      if(*time_specific_alpha == 1 & *unit_specific_alpha==1){ // local time and local unit
         for(j = 0; j < *nsubject; j++){
           for(t = 1; t < *ntime; t++){
             sumg =  gamma_iter[j*ntime1 + t];
@@ -1479,7 +1487,7 @@ void informed_ar1_sppm(int *draws, int *burn, int *thin,
     	
         if(np1 > -1 & np1 < 1){
           llo = 0.0, lln = 0.0;
-    	  for(t=2; t < *ntime; t++){// Note that we are starting at ts + 1 since ts is the first time point
+    	  for(t=2; t < *ntime; t++){// 
     
     	    llo = llo + dnorm(theta_iter[t], phi0_iter*(1-op1) + op1*theta_iter[t-1], 
     		 	    	                             sqrt(lam2_iter*(1.0 - op1*op1)), 1);
