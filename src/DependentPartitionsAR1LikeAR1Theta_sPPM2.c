@@ -72,7 +72,7 @@ void drpm_ar1_sppm(int *draws, int *burn, int *thin, int *nsubject, int *ntime,
 			  int *time_specific_alpha, 
 			  int *update_alpha, int *update_eta1, int *update_phi1, 
 			  int *sPPM, int *SpatialCohesion, double *cParms, double *mh,
-			  int *space_1,
+			  int *space_1, int *simpleModel, double *theta_tau2,
 			  int *Si, double *mu, double *sig2, double *eta1, double *theta, double *tau2, 
 			  double *phi0, double *phi1, double *lam2, int *gamma, double *alpha_out, 
 			  double *fitted, double *llike, double *lpml, double *waic){
@@ -140,9 +140,15 @@ void drpm_ar1_sppm(int *draws, int *burn, int *thin, int *nsubject, int *ntime,
 	// ===================================================================================
 
 	double *muh = R_VectorInit((*nsubject)*(ntime1), 0.0);
-	double *sig2h = R_VectorInit((*nsubject)*(ntime1), 0.5);
+	double *sig2h = R_VectorInit((*nsubject)*(ntime1), 1.0);
 
-
+    if(*simpleModel==1){
+      for(t = 0; t < ntime1; t++){
+        theta_iter[t] = theta_tau2[0];
+        tau2_iter[t] = theta_tau2[1];
+      }
+    }
+//    RprintVecAsMat("theta", theta_iter, 1, ntime1);
 	int nh[(*nsubject)*(ntime1)];
 
 
@@ -1179,6 +1185,7 @@ void drpm_ar1_sppm(int *draws, int *burn, int *thin, int *nsubject, int *ntime,
 						
 						muh[(Si_iter[j*(ntime1) + t]-1)*(ntime1) + t] = mudraw;
 						sig2h[(Si_iter[j*(ntime1) + t]-1)*(ntime1) + t] = sigdraw*sigdraw;
+		                if(*simpleModel==1) sig2h[(Si_iter[j*(ntime1) + t]-1)*(ntime1) + t] = 1.0;
 
 					}
 
@@ -1410,7 +1417,7 @@ void drpm_ar1_sppm(int *draws, int *burn, int *thin, int *nsubject, int *ntime,
 						sig2h[k*(ntime1) + t] = nsig*nsig;					
 					}
 
-//					sig2h[k*(ntime1) + t] = 1.0;
+		            if(*simpleModel==1) sig2h[k*(ntime1) + t] = 1.0;
 
 				}	
 
@@ -1476,6 +1483,7 @@ void drpm_ar1_sppm(int *draws, int *burn, int *thin, int *nsubject, int *ntime,
 //			Rprintf("sqrt(s2star) = %f\n", sqrt(s2star));
 		
 			theta_iter[t] = rnorm(mstar, sqrt(s2star));
+	        if(*simpleModel==1) theta_iter[t] = 0.0;
 
 //			Rprintf("theta_iter = %f\n", theta_iter[t]);
 
@@ -1521,6 +1529,7 @@ void drpm_ar1_sppm(int *draws, int *burn, int *thin, int *nsubject, int *ntime,
 //					tau2_iter[t] = 5*5;
 				}
 
+	            if(*simpleModel==1) tau2_iter[t] = theta_tau2[1];
 
 			}	
 			
@@ -1657,7 +1666,7 @@ void drpm_ar1_sppm(int *draws, int *burn, int *thin, int *nsubject, int *ntime,
 			
 			}
 
-			//alpha_iter[0] = 0.0;
+			alpha_iter[0] = 0.0;
 
 		}
 

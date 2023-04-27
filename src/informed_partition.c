@@ -355,7 +355,7 @@ void informed_ar1_sppm(int *draws, int *burn, int *thin,
 	
   for(i = 0; i < *draws; i++){
 
-    if((i+1) % 5000 == 0){
+    if((i+1) % 25000 == 0){
 	  time_t now;
 	  time(&now);
 
@@ -1287,7 +1287,7 @@ void informed_ar1_sppm(int *draws, int *burn, int *thin,
 //	  Rprintf("sqrt(s2star) = %f\n", sqrt(s2star));
 		
 	  theta_iter[t] = rnorm(mstar, sqrt(s2star));
-	  if(*simpleModel==1) theta_iter[t] = 0.0;
+	  if(*simpleModel==1) theta_iter[t] = theta_tau2[0];
 
 //	  Rprintf("theta_iter = %f\n", theta_iter[t]);
 

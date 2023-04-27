@@ -83,8 +83,9 @@ drpm_fit <- function(y,s_coords=NULL,
 	update_phi1 <- ifelse(phi1_0==TRUE, 0, 1)
 
 	ntime_out <- ntime
-
-	if(!is.null(initial_partition)){
+  cat("ntime = ", ntime, "\n")
+  cat("ntime_out = ", ntime_out, "\n")
+  if(!is.null(initial_partition)){
 	  #cat(initial_partition, "\n")
 	  C.out <- .C("informed_ar1_sppm",
 	              as.integer(draws), as.integer(burn),as.integer(thin),
@@ -121,6 +122,7 @@ drpm_fit <- function(y,s_coords=NULL,
 	              as.integer(update_alpha), as.integer(update_eta1), as.integer(update_phi1),
 	              as.integer(sPPM), as.integer(SpatialCohesion), as.double(cParms),
 	              as.double(mh), as.integer(space_1),
+	              as.integer(simpleModel), as.double(theta_tau2),
 	              Si.draws = as.integer(Si),mu.draws = as.double(mu),
 	              sig2.draws = as.double(sig2), eta1.draws = as.double(eta1),
 	              theta.draws = as.double(theta), tau2.draws = as.double(tau2),
@@ -132,6 +134,9 @@ drpm_fit <- function(y,s_coords=NULL,
 	}
 
 #}
+
+  cat("ntime = ", ntime, "\n")
+  cat("ntime_out = ", ntime_out, "\n")
 
 	out <- NULL
 	out$Si <- array(C.out$Si.draws, c(ntime,nsubject,nout))[1:ntime_out,,,drop=FALSE]
