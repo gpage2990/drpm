@@ -1688,6 +1688,7 @@ void informed_ar1_sppm(int *draws, int *burn, int *thin,
     	  mudraw = muh[(Si_iter[j*(ntime1) + t]-1)*(ntime1) + t];
     	  sigdraw = sqrt(sig2h[(Si_iter[j*(ntime1) + t]-1)*(ntime1) + t]);
     
+          Rprintf("sigdraw = %f\n", sigdraw);
     
     	  if(t == 1){
     
@@ -1719,7 +1720,7 @@ void informed_ar1_sppm(int *draws, int *burn, int *thin,
       if(like0==0){
         for(j = 0; j < *nsubject; j++){
     	  for(t = 1; t < *ntime; t++){
-    	    CPO[j*(*ntime)+t] = CPO[j*(*ntime)+t] + (1/exp(like_iter[j*(*ntime)+t]));
+    	    CPO[j*(*ntime)+t] = CPO[j*(*ntime)+t] + (1/(double) nout)*(1/exp(like_iter[j*(*ntime)+t]));
     	  }
     	}
       }
@@ -1777,7 +1778,7 @@ void informed_ar1_sppm(int *draws, int *burn, int *thin,
 //	  Rprintf("j = %d\n", j);
 //	  Rprintf("CPO = %f\n", CPO[j*(*ntime)+t]);
 				
-	  lpml_iter = lpml_iter - log((1/(double) nout-nout_0)*CPO[j*(*ntime)+t]);
+	  lpml_iter = lpml_iter + log(1/CPO[j*(*ntime)+t]);
 				
 	}
   }
