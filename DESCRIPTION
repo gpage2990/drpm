@@ -6,7 +6,9 @@ Authors@R: person(given = "Garritt", family = "L. Page", email = "page@stat.byu.
 Maintainer: Garritt L. Page <page@stat.byu.edu>
 Description: Provides an R-wrapper function that access C-code that fits models that employ a 
               dependent random partition model as detailed in Page et al. <arXiv:1912.11542>.
-              All the models detailed in the paper are available as special cases. 
+              All the models detailed in the paper are available as special cases. In addition,
+              it is possible to include an ``initial'' partition as detailed in 
+              <arXiv:1912.11542>.
 License: GPL
 Encoding: UTF-8
 LazyData: true
