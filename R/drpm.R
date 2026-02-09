@@ -13,6 +13,7 @@ drpm_fit <- function(y,s_coords=NULL,
 					           starting_alpha=0.5,
 					           unit_specific_alpha = FALSE, # FALSE implies one alpha for all units
 					           time_specific_alpha = FALSE, # FALSE implies one alpha for all time
+					           alpha_model = "beta",
 					           alpha_0=FALSE, # TRUE means alpha=starting_alpha not updated
 					           eta1_0=FALSE, # TRUE means that eta1 = 0 not updated
 					           phi1_0=FALSE, # TRUE means that phi1 = 0 not updated
@@ -94,6 +95,7 @@ drpm_fit <- function(y,s_coords=NULL,
 	              as.double(M), as.integer(initial_partition), as.double(alpha),
 	              as.double(modelPriors),as.double(t(alphaPriors)),
 	              as.integer(time_specific_alpha), as.integer(unit_specific_alpha),
+	              as.integer(ifelse(alpha_model == "beta", 1, 0)),
 	              as.integer(update_alpha), as.integer(update_eta1), as.integer(update_phi1),
 	              as.integer(sPPM), as.integer(SpatialCohesion), as.double(cParms),
 	              as.double(mh), as.integer(space_1),

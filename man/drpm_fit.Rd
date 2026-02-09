@@ -9,6 +9,7 @@ drpm_fit(y,
          starting_alpha = 0.5,
          unit_specific_alpha = FALSE,
          time_specific_alpha = FALSE,
+         alpha_model = "beta",
          alpha_0=FALSE,
          eta1_0=FALSE,
          phi1_0=FALSE,
@@ -24,7 +25,7 @@ drpm_fit(y,
 }
 
 \description{
-\code{drpm_fit} is the main function used to fit model with Gaussian likelihood and spatio-temporal dependent random partition model.  An initial ``guess'' on the partition can be provided as well as prior information on the ``certainty'' associated with the initial guess.   In the model, temporal dependence could possibly appear in three places a) AR(1) process in data model, b) AR(1) process associated with mean model of atoms, c) temporal dependence in the partition.
+\code{drpm_fit} is the main function used to fit model with Gaussian likelihood and spatio-temporal dependent random partition model.  An initial ``guess'' on the partition can be provided and prior information on the ``certainty'' associated with the initial guess.   In the model, temporal dependence could possibly appear in three places a) AR(1) process in data model, b) AR(1) process associated with mean model of atoms, c) temporal dependence in the partition.
 
 }
 
@@ -42,6 +43,8 @@ drpm_fit(y,
 \item{unit_specific_alpha}{Logical that indicates if a unique alpha is to be included for each unit.}
 
 \item{time_specific_alpha}{Logical that indicates if a unique alpha is to be included for each time point.}
+
+\item{alpha_model}{Logical that indicates if prior for alpha is a beta or autoregression of logit(alpha).}
 
 \item{alpha_0}{Logical where TRUE indicates alpha_t = starting_alpha (i.e., alpha is not updated)}
 

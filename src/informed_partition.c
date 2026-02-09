@@ -34,10 +34,16 @@
 * s2 = nsubject x 1 vector containing spatial coordinate two
 *
 * M = double indicating value of M associated with cohesion (scale parameter of DP).
+* initial_partition = nsubject x 1 vector containing cluster labels for prior partition
 * alpha = double - prior probability of being pegged, starting value only if update_alpha is TRUE
-* priorvals = vector containing values for prior distributions as follows
+*
+* modelPriors
+* alphaPriors = vector containing values for prior distributions as follows
 *
 * time_specific_alpha = integer - logical indicating wether to make alpha time-specific or constant over time.
+* unit_specific_alpha = integer - logical indicating whether to make alpha unit-specific
+* alpha_model = integer - logical indicating on whether to use a beta or AR(1) type model 
+*
 * update_alpha = integer - logical indicating wether to update alpha or not.
 * update_eta1 = integer - logical indicating whether to update eta1 or set it to zero for all subjects.
 * update_phi1 = integer - logical indicating whether to update phi1 or set it to zero.
@@ -48,6 +54,10 @@
 *	2- Double dipper
 *
 * cParms - vector holding values employed in the cohesion
+* mh - vector holding variance for metropolis updating step
+* space_1 = logical indicating if spatial information only included in the first time point.  
+* simpleModel = logical indicating of simple model from Sally should be used 
+* theta_tau2 = 2 x 1 vector containing values to which theta and tau2 are set in the simple model 
 *
 * OUTPUT
 * Si -
@@ -69,9 +79,10 @@
 void informed_ar1_sppm(int *draws, int *burn, int *thin, 
               int *nsubject, int *ntime,
 			  double *y, double *s1, double *s2, 
-			  double *M, int *centering_partition, double *alpha, 
+			  double *M, int *initial_partition, double *alpha, 
 			  double *modelPriors, double *alphaPriors,
 			  int *time_specific_alpha, int *unit_specific_alpha,
+			  int *alpha_model,
 			  int *update_alpha, int *update_eta1, int *update_phi1, 
 			  int *sPPM, int *SpatialCohesion, double *cParms, double *mh,
 			  int *space_1, int *simpleModel, double *theta_tau2,
@@ -104,9 +115,10 @@ void informed_ar1_sppm(int *draws, int *burn, int *thin,
   Rprintf("update_eta1 = %d\n", *update_eta1);
   Rprintf("update_phi1 = %d\n", *update_phi1);
   
+  Rprintf("alpha_model = %d\n", *alpha_model);
   
-  RprintIVecAsMat("cp", centering_partition, 1, *nsubject);
-  // int cp = centering_partition[0];
+  RprintIVecAsMat("cp", initial_partition, 1, *nsubject);
+  // int cp = initial_partition[0];
   
   Rprintf("Fitting informed partition model \n");
 	
@@ -146,6 +158,9 @@ void informed_ar1_sppm(int *draws, int *burn, int *thin,
   double lam2_iter = runif(0, modelPriors[4]*modelPriors[4]); if(*ntime==2) lam2_iter=modelPriors[1];
 
   double *alpha_iter = R_VectorInit((*nsubject)*(ntime1), *alpha);	
+  double *beta0_iter = R_VectorInit((*nsubject), 0);
+  double *beta1_iter = R_VectorInit((*nsubject), 0);
+  double *kappa2_iter = R_VectorInit((*nsubject), 1);
   // ===================================================================================
   // 
   // Memory vectors to hold MCMC iterates for cluster specific parameters
@@ -188,7 +203,7 @@ void informed_ar1_sppm(int *draws, int *burn, int *thin,
   // This will then be the first entry of all subsequent MCMC 
   // iterates and stored as well.
   for(j=0; j<*nsubject; j++){
-    Si_iter[j*(ntime1) + 0] = centering_partition[j];
+    Si_iter[j*(ntime1) + 0] = initial_partition[j];
     gamma_iter[j*(ntime1) + 0] = 1;
   }
 
@@ -276,7 +291,8 @@ void informed_ar1_sppm(int *draws, int *burn, int *thin,
   	
   // stuff that I need to update alpha
   int sumg;
-  double astar, bstar,alpha_tmp;
+  double astar, bstar,alpha_tmp, ao, an, logitao, logitan, logita_1, pm;
+  double logita, vstar, sumg2, ssq;
 	
   // Stuff to compute lpml, likelihood, and WAIC
   int like0, nout_0=0;
@@ -339,7 +355,7 @@ void informed_ar1_sppm(int *draws, int *burn, int *thin,
 //	RprintVecAsMat("mh", mh, 1, 5);
   // M-H step tunning parameter
   double csigSIG=mh[0], csigTAU=mh[1], csigLAM=mh[2], csigETA1=mh[3], csigPHI1=mh[4];
-
+  double csigALPHA = 0.1;
 //	Rprintf("csigETA1 = %f\n", csigETA1);
 
 
@@ -1405,23 +1421,108 @@ void informed_ar1_sppm(int *draws, int *burn, int *thin,
 		for(t=1;t<*ntime;t++){alpha_iter[t] = alpha_tmp;}
 	    alpha_iter[0] = 1.0;
       }
+      
+      
       if(*time_specific_alpha == 1 & *unit_specific_alpha==0){   // local time and global unit 
-	    for(t = 1; t < *ntime; t++){
-	      sumg = 0;
-		  for(j = 0; j < *nsubject; j++){
-		    sumg = sumg + gamma_iter[j*ntime1 + t];
-		  }
-//          Rprintf("sumg = %d\n", sumg);
-//          Rprintf("alphaPriors[0] = %f\n", alphaPriors[0]);
-//          Rprintf("alphaPriors[1] = %f\n", alphaPriors[1]);
+        if(*alpha_model==1){ // Use the beta-bernoulli model for alpha
+	      for(t = 1; t < *ntime; t++){
+	        sumg = 0;
+		    for(j = 0; j < *nsubject; j++){
+		      sumg = sumg + gamma_iter[j*ntime1 + t];
+		    }
+//            Rprintf("sumg = %d\n", sumg);
+//            Rprintf("alphaPriors[0] = %f\n", alphaPriors[0]);
+//            Rprintf("alphaPriors[1] = %f\n", alphaPriors[1]);
 	
-		  astar = (double) sumg + alphaPriors[0];
-		  bstar = (double) ((*nsubject) - sumg) + alphaPriors[1];
+		    astar = (double) sumg + alphaPriors[0];
+		    bstar = (double) ((*nsubject) - sumg) + alphaPriors[1];
 
-		  alpha_iter[t] = rbeta(astar, bstar);
+		    alpha_iter[t] = rbeta(astar, bstar);
+          }
+	      alpha_iter[0] = 1.0;
+	    }
+	    if(*alpha_model==0){ // use the latent autoregressive process model for alpha
+	      for(t = 1; t < *ntime; t++){
+	        ao = alpha_iter[t];
+	        an = rnorm(ao,  csigALPHA);
+	        logitao = log(ao/(1-ao));
+	        logitan = log(an/(1-an));
+	        if(t==1){
+	          pm = alphaPriors[0]/(alphaPriors[0] + alphaPriors[1]); 
+	          logita_1 = log(pm/(1-pm));
+	        } else {
+	          logita_1 = log(alpha_iter[t-1]/(1-alpha_iter[t-1]));
+	        }
+	        sumg = 0;
+		    for(j = 0; j < *nsubject; j++){
+		      sumg = sumg + gamma_iter[j*ntime1 + t];
+		    }
+	      
+	        llo = sumg*log(ao) + ((*nsubject) - sumg)*log(1-ao) + 
+	              dnorm(logitao, beta0_iter[0] + beta1_iter[0]*logita_1, sqrt(kappa2_iter[0]), 1);
+	        lln = sumg*log(an) + ((*nsubject) - sumg)*log(1-an) + 
+	              dnorm(logitan, beta0_iter[0] + beta1_iter[0]*logita_1, sqrt(kappa2_iter[0]), 1);
+	              
+	        llr = lln - llo;
+	        if(llr > log(runif(0,1))) alpha_iter[t] = an;
+	              
+	      }
+          // update beta0_iter
+          sumg = 0.0;
+          for(t = 1; t < *ntime; t++){
+	        if(t==1){
+	          pm = alphaPriors[0]/(alphaPriors[0] + alphaPriors[1]); 
+	          logita_1 = log(pm/(1-pm));
+	        } else {
+	          logita_1 = log(alpha_iter[t-1]/(1-alpha_iter[t-1]));
+	        }
+	        logita = log(alpha_iter[t]/(1-alpha_iter[t]));
+	        sumg = sumg + (logita -  beta1_iter[0]*logita_1);
+          }
+          mstar =  ((1/kappa2_iter[0])*sumg + (1/s20)*m0)/
+                   (*ntime/kappa2_iter[0] + 1/s20);	
+          vstar = 1/(*ntime/kappa2_iter[0] + 1/s20);
+          beta0_iter[0] = rnorm(mstar, sqrt(vstar));
+          
+          // update beta1_iter
+          sumg = 0.0;
+          sumg2 = 0.0;
+          for(t = 1; t < *ntime; t++){
+	        if(t==1){
+	          pm = alphaPriors[0]/(alphaPriors[0] + alphaPriors[1]); 
+	          logita_1 = log(pm/(1-pm));
+	        } else {
+	          logita_1 = log(alpha_iter[t-1]/(1-alpha_iter[t-1]));
+	        }
+	        logita = log(alpha_iter[t]/(1-alpha_iter[t]));
+	        sumg = sumg + logita_1*(logita -  beta0_iter[0]);
+	        sumg2 = sumg2 + logita_1*logita_1;
+          }
+          mstar =  ((1/kappa2_iter[0])*sumg + (1/s20)*m0)/
+                   (sumg2/kappa2_iter[0] + 1/s20);	
+          vstar = 1/(sumg2/kappa2_iter[0] + 1/s20);
+          beta1_iter[0] = rnorm(mstar, sqrt(vstar));
+          
+          // update kappa2
+          ssq = 0.0;
+          for(t = 1; t < *ntime; t++){
+	        if(t==1){
+	          pm = alphaPriors[0]/(alphaPriors[0] + alphaPriors[1]); 
+	          logita_1 = log(pm/(1-pm));
+	        } else {
+	          logita_1 = log(alpha_iter[t-1]/(1-alpha_iter[t-1]));
+	        }
+	        logita = log(alpha_iter[t]/(1-alpha_iter[t]));
+	        
+	        ssq = ssq + (logita - (beta0_iter[0] + beta1_iter[0]*logita_1))*
+	                    (logita - (beta0_iter[0] + beta1_iter[0]*logita_1));
+          }
+          astar = 0.5*(*ntime) + 1.0;
+          bstar = 0.5*ssq + 1.0;
+          kappa2_iter[0] = 1/rgamma(astar, bstar);
         }
-	    alpha_iter[0] = 1.0;
-      } 
+      }
+      
       if(*time_specific_alpha == 0 & *unit_specific_alpha==1){ // global time and local unit
         for(j = 0; j < *nsubject; j++){
           sumg = 0;
@@ -1435,29 +1536,111 @@ void informed_ar1_sppm(int *draws, int *burn, int *thin,
 		  alpha_iter[j*ntime1 + 1] = rbeta(astar, bstar);
         }
 	  }
+	  
+	  
       if(*time_specific_alpha == 1 & *unit_specific_alpha==1){ // local time and local unit
-        for(j = 0; j < *nsubject; j++){
-          for(t = 1; t < *ntime; t++){
-            sumg =  gamma_iter[j*ntime1 + t];
+        if(*alpha_model==1){
+          for(j = 0; j < *nsubject; j++){
+            for(t = 1; t < *ntime; t++){
+              sumg =  gamma_iter[j*ntime1 + t];
 
-		    astar = (double) sumg + alphaPriors[j*2 + 0];
-		    bstar = (double) ((*ntime-1) - sumg) +  alphaPriors[j*2 + 1];
+		      astar = (double) sumg + alphaPriors[j*2 + 0];
+		      bstar = (double) ((*ntime-1) - sumg) +  alphaPriors[j*2 + 1];
 		  
-		    alpha_iter[j*ntime1 + t] = rbeta(astar, bstar);
+		      alpha_iter[j*ntime1 + t] = rbeta(astar, bstar);
+            }
           }
+	    }
+      }
+      if(*alpha_model==0){
+        for(j=0; j < *nsubject; j++){
+	      for(t = 1; t < *ntime; t++){
+	        ao = alpha_iter[j*ntime1 + t];
+	        an = rnorm(ao,  csigALPHA);
+	        logitao = log(ao/(1-ao));
+	        logitan = log(an/(1-an));
+	        if(t==1){
+	          pm = alphaPriors[j*2+0]/(alphaPriors[j*2+0] + alphaPriors[j*2+1]); 
+	          logita_1 = log(pm/(1-pm));
+	        } else {
+	          logita_1 = log(alpha_iter[j*ntime1+t-1]/(1-alpha_iter[j*ntime1+t-1]));
+	        }
+		    sumg = gamma_iter[j*ntime1 + t];
+	      
+	        llo = sumg*log(ao) + (1.0 - sumg)*log(1-ao) + 
+	              dnorm(logitao, beta0_iter[j] + beta1_iter[j]*logita_1, sqrt(kappa2_iter[j]), 1);
+	        lln = sumg*log(an) + (1.0 - sumg)*log(1-an) + 
+	              dnorm(logitan, beta0_iter[j] + beta1_iter[j]*logita_1, sqrt(kappa2_iter[j]), 1);
+	              
+	        llr = lln - llo;
+	        if(llr > log(runif(0,1))) alpha_iter[j*ntime1 + t] = an;
+	              
+	      }
+          // update beta0_iter
+          sumg = 0.0;
+          for(t = 1; t < *ntime; t++){
+	        if(t==1){
+	          pm = alphaPriors[j*2+0]/(alphaPriors[j*2+0] + alphaPriors[j*2+1]); 
+	          logita_1 = log(pm/(1-pm));
+	        } else {
+	          logita_1 = log(alpha_iter[j*ntime1+t-1]/(1-alpha_iter[j*ntime1+t-1]));
+	        }
+	        logita = log(alpha_iter[j*ntime1+t]/(1-alpha_iter[j*ntime1+t]));
+	        sumg = sumg + (logita -  beta1_iter[j]*logita_1);
+          }
+          mstar =  ((1/kappa2_iter[j])*sumg + (1/s20)*m0)/
+                   (*ntime/kappa2_iter[j] + 1/s20);	
+          vstar = 1/(*ntime/kappa2_iter[j] + 1/s20);
+          beta0_iter[j] = rnorm(mstar, sqrt(vstar));
+          
+          // update beta1_iter
+          sumg = 0.0;
+          sumg2 = 0.0;
+          for(t = 1; t < *ntime; t++){
+	        if(t==1){
+	          pm = alphaPriors[j*2+0]/(alphaPriors[j*2+0] + alphaPriors[j*2+1]); 
+	          logita_1 = log(pm/(1-pm));
+	        } else {
+	          logita_1 = log(alpha_iter[j*ntime1+t-1]/(1-alpha_iter[j*ntime1+t-1]));
+	        }
+	        logita = log(alpha_iter[j*ntime1+t]/(1-alpha_iter[j*ntime1+t]));
+	        sumg = sumg + logita_1*(logita -  beta0_iter[j]);
+	        sumg2 = sumg2 + logita_1*logita_1;
+          }
+          mstar =  ((1/kappa2_iter[j])*sumg + (1/s20)*m0)/
+                   (sumg2/kappa2_iter[j] + 1/s20);	
+          vstar = 1/(sumg2/kappa2_iter[j] + 1/s20);
+          beta1_iter[j] = rnorm(mstar, sqrt(vstar));
+          
+          // update kappa2
+          ssq = 0.0;
+          for(t = 1; t < *ntime; t++){
+	        if(t==1){
+	          pm = alphaPriors[j*2+0]/(alphaPriors[j*2+0] + alphaPriors[j*2+1]); 
+	          logita_1 = log(pm/(1-pm));
+	        } else {
+	          logita_1 = log(alpha_iter[j*ntime1+t-1]/(1-alpha_iter[j*ntime1+t-1]));
+	        }
+	        logita = log(alpha_iter[j*ntime1+t]/(1-alpha_iter[j*ntime1+t]));
+	        
+	        ssq = ssq + (logita - (beta0_iter[j] + beta1_iter[j]*logita_1))*
+	                    (logita - (beta0_iter[j] + beta1_iter[j]*logita_1));
+          }
+          astar = 0.5*(*ntime) + 1.0;
+          bstar = 0.5*ssq + 1.0;
+          kappa2_iter[j] = 1/rgamma(astar, bstar);
         }
-	  }
+      }
     }
-
 //	RprintVecAsMat("alpha_iter", alpha_iter, *nsubject, ntime1);
 	
 
     if(*ntime>2){
 
       //////////////////////////////////////////////////////////////////////////////
-      //																			//
-      // update phi0																//
-      //																			//
+      //																		  //
+      // update phi0															  //
+      //																		  //
       //////////////////////////////////////////////////////////////////////////////
       phi1sq = phi1_iter*phi1_iter;
       one_phisq = (1-phi1_iter)*(1-phi1_iter);
@@ -1688,7 +1871,7 @@ void informed_ar1_sppm(int *draws, int *burn, int *thin,
     	  mudraw = muh[(Si_iter[j*(ntime1) + t]-1)*(ntime1) + t];
     	  sigdraw = sqrt(sig2h[(Si_iter[j*(ntime1) + t]-1)*(ntime1) + t]);
     
-          Rprintf("sigdraw = %f\n", sigdraw);
+//          Rprintf("sigdraw = %f\n", sigdraw);
     
     	  if(t == 1){
     
