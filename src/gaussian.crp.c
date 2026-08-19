@@ -47,7 +47,8 @@ static void gibbs_crp(double* y, int* n,
             int* niter, int *nburn, int *nthin,
             double* mu, double* sigma2, 
             int* z, double* theta, double* tau2, int* nclus,
-            double* llike, double* fitted, double* lpml, double* waic ){
+            double* llike, double* fitted,  double* ppred, 
+            double* lpml, double* waic ){
 
 
   int i, j, jj, k, ii;
@@ -60,7 +61,7 @@ static void gibbs_crp(double* y, int* n,
   double mstar, vstar, mudraw, sigdraw, maxph;
   double llo, lln, llr, osig, nsig, otau, ntau, auxs;
 
-  double _lpml, elppdWAIC, _theta, _tau2;
+  double _lpml, elppdWAIC, _theta, _tau2, _ppred;
   double _mu[*n], _sigma2[*n], _like[*n], _fitted[*n];
   int _z[*n], nh[*n], _nclus=0, iaux; 
   
@@ -302,7 +303,8 @@ static void gibbs_crp(double* y, int* n,
       }
     }
     
-    // evaluate likelihood and keep iterates and produce fitted values
+    // evaluate likelihood and keep iterates and produce fitted values and 
+    // predictions for new subject
     if((i > (*nburn-1)) & ((i+1) % *nthin ==0)){
     
       // evaluate likelihood to Compute the CPO and lpml
@@ -320,11 +322,55 @@ static void gibbs_crp(double* y, int* n,
         CPOinv[j] = CPOinv[j] + (1/(double) nout)*(1/_like[j]);
       }
     
+      // sample from the posterior predictive distribution 
+      for(k=0; k < _nclus; k++){
+        ph[k] = log((double) nh[k]);
+	  }
+	  ph[_nclus] = log(M);
+
+	  maxph = ph[0];
+	  for(k=1; k<_nclus+1; k++){
+	    if(ph[k] > maxph) maxph = ph[k];
+	  }
+	  
+	  denph = 0.0;
+	  for(k = 0; k < _nclus+1; k++){
+	    ph[k] = exp(ph[k] - maxph);
+		denph = denph + ph[k];
+	  }
+
+	  for(k = 0; k < _nclus+1; k++){
+	    ph[k] = ph[k]/denph;
+	  }
+	
+	  uu = runif(0.0,1.0);
+		
+	  cprob= 0.0;;
+	  for(k = 0; k < _nclus+1; k++){
+	    cprob = cprob + ph[k];
+		if (uu < cprob){
+		  iaux = k+1;
+		  break;	
+		}
+	  }		
+
+	  if(iaux <= _nclus){
+        mudraw = _mu[(iaux-1)];
+        sigdraw = sqrt(_sigma2[(iaux-1)]);
+      }else{
+        mudraw = rnorm(_theta,sqrt(_tau2));
+        sigdraw = runif(0, *A);
+      }
+
+      _ppred = rnorm(mudraw, sigdraw);
+
+    
     
       // save  iterates
       theta[ii] = _theta;
       tau2[ii] = _tau2;
       nclus[ii] = _nclus;
+      ppred[ii] = _ppred;
       
       for(j=0; j<*n; j++){
         mu[ii + nout*j] = _mu[_z[j]-1];
@@ -383,11 +429,12 @@ SEXP GIBBS_CRP(SEXP y, SEXP n, SEXP m, SEXP v, SEXP A, SEXP A0, SEXP alpha,
   SEXP FITTED = PROTECT(allocMatrix(REALSXP, nout, _n)); nprot++;
   SEXP THETA = PROTECT(allocMatrix(REALSXP, nout, 1)); nprot++;
   SEXP TAU2 = PROTECT(allocMatrix(REALSXP, nout, 1)); nprot++;
+  SEXP PPRED = PROTECT(allocMatrix(REALSXP, nout, 1)); nprot++;
   SEXP WAIC = PROTECT(Rf_allocVector(REALSXP, 1)); nprot++;
   SEXP LPML = PROTECT(Rf_allocVector(REALSXP, 1)); nprot++;
 
 
-  double *MUout, *SIGMA2out, *THETAout, *TAU2out;
+  double *MUout, *SIGMA2out, *THETAout, *TAU2out, *PPREDout;
   double *LLIKEout, *WAICout, *LPMLout, *FITTEDout;
   int *Zout, *NCLUSout;
 
@@ -397,7 +444,8 @@ SEXP GIBBS_CRP(SEXP y, SEXP n, SEXP m, SEXP v, SEXP A, SEXP A0, SEXP alpha,
   NCLUSout = INTEGER(NCLUS);
   THETAout = REAL(THETA);
   TAU2out = REAL(TAU2);
-
+  PPREDout = REAL(PPRED);
+  
   LLIKEout = REAL(LLIKE);
   FITTEDout = REAL(FITTED);
   WAICout = REAL(WAIC);
@@ -406,12 +454,12 @@ SEXP GIBBS_CRP(SEXP y, SEXP n, SEXP m, SEXP v, SEXP A, SEXP A0, SEXP alpha,
   GetRNGstate();
 
   gibbs_crp(REAL(y), &_n, &_m, &_v, &_A, &_A0, &_alpha, REAL(mh), &_niter, &_nburn, &_nthin, 
-        MUout, SIGMA2out, Zout, THETAout, TAU2out, NCLUSout, LLIKEout, FITTEDout, LPMLout, WAICout);
+        MUout, SIGMA2out, Zout, THETAout, TAU2out, NCLUSout, LLIKEout, FITTEDout, PPREDout, LPMLout, WAICout);
 
   PutRNGstate();
 
 
-  SEXP ans = PROTECT(allocVector(VECSXP, 10)); nprot++;
+  SEXP ans = PROTECT(allocVector(VECSXP, 11)); nprot++;
   SET_VECTOR_ELT(ans, 0, MU);
   SET_VECTOR_ELT(ans, 1, SIGMA2);
   SET_VECTOR_ELT(ans, 2, Z);
@@ -420,11 +468,12 @@ SEXP GIBBS_CRP(SEXP y, SEXP n, SEXP m, SEXP v, SEXP A, SEXP A0, SEXP alpha,
   SET_VECTOR_ELT(ans, 5, TAU2);
   SET_VECTOR_ELT(ans, 6, LLIKE);
   SET_VECTOR_ELT(ans, 7, FITTED);
-  SET_VECTOR_ELT(ans, 8, LPML);
-  SET_VECTOR_ELT(ans, 9, WAIC);
+  SET_VECTOR_ELT(ans, 8, PPRED);
+  SET_VECTOR_ELT(ans, 9, LPML);
+  SET_VECTOR_ELT(ans, 10, WAIC);
 
 
-  SEXP nm = allocVector(STRSXP, 10);
+  SEXP nm = allocVector(STRSXP, 11);
   setAttrib(ans, R_NamesSymbol, nm);
   SET_STRING_ELT(nm, 0, mkChar("mu"));
   SET_STRING_ELT(nm, 1, mkChar("sigma2"));
@@ -434,8 +483,9 @@ SEXP GIBBS_CRP(SEXP y, SEXP n, SEXP m, SEXP v, SEXP A, SEXP A0, SEXP alpha,
   SET_STRING_ELT(nm, 5, mkChar("tau2"));
   SET_STRING_ELT(nm, 6, mkChar("llike"));
   SET_STRING_ELT(nm, 7, mkChar("fitted"));
-  SET_STRING_ELT(nm, 8, mkChar("lpml"));
-  SET_STRING_ELT(nm, 9, mkChar("waic"));
+  SET_STRING_ELT(nm, 8, mkChar("ppred"));
+  SET_STRING_ELT(nm, 9, mkChar("lpml"));
+  SET_STRING_ELT(nm, 10, mkChar("waic"));
 
   UNPROTECT(nprot);
   return(ans);

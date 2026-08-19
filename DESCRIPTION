@@ -1,14 +1,19 @@
 Package: drpm
 Type: Package
 Title: Dependent Random Partition Model
-Version: 0.1.2
+Version: 0.1.3
 Authors@R: person(given = "Garritt", family = "L. Page", email = "page@stat.byu.edu", role = c("aut", "cre", "cph"))
 Maintainer: Garritt L. Page <page@stat.byu.edu>
 Description: Provides an R-wrapper function that access C-code that fits models that employ a 
               dependent random partition model as detailed in Page et al. <arXiv:1912.11542>.
               All the models detailed in the paper are available as special cases. In addition,
               it is possible to include an ``initial'' partition as detailed in 
-              <arXiv:1912.11542>.
+              <arXiv:1912.11542>. Also provides a Gaussian multiview restricted partition
+              sampler with joint consensus/view updates and exact joint predictive scoring.
 License: GPL
 Encoding: UTF-8
-LazyData: true
+Imports: Rcpp
+LinkingTo: Rcpp
+NeedsCompilation: yes
+Packaged: 2026-08-12 21:11:17 UTC; gpage
+Author: Garritt L. Page [aut, cre, cph]

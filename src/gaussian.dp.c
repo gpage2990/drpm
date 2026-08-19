@@ -47,7 +47,8 @@ static void gibbs(double* y, int* n, int *N,
             int* niter, int *nburn, int *nthin,
             double* mu, double* sigma2, double* w, 
             int* z, double* theta, double* tau2,
-            double* llike, double* fitted, double* lpml, double* waic ){
+            double* llike, double* fitted,
+            double* lpml, double* waic ){
 
 
   int i, j, k, ii, nk;

@@ -1,7 +1,9 @@
 useDynLib(drpm, .registration = TRUE)
+importFrom(Rcpp,evalCpp)
 
 export(drpm_fit)
 export(weightedDDP)
 export(linearDDP)
 export(gaussian_crp)
 export(gaussian_dp)
+export(drpm_mv)

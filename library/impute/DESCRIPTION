@@ -1,0 +1,18 @@
+Package: impute
+Title: impute: Imputation for microarray data
+Version: 1.84.0
+Author: Trevor Hastie, Robert Tibshirani, Balasubramanian Narasimhan,
+        Gilbert Chu
+Description: Imputation for microarray data (currently KNN only)
+Maintainer: Balasubramanian Narasimhan <naras@stat.Stanford.EDU>
+Depends: R (>= 2.10)
+License: GPL-2
+biocViews: Microarray
+Repository: https://bioc-release.r-universe.dev
+Date/Publication: 2025-10-29 13:54:25 UTC
+RemoteUrl: https://github.com/bioc/impute
+RemoteRef: RELEASE_3_22
+RemoteSha: 987333765032b156b0b3bb09a5defb85043d9520
+NeedsCompilation: yes
+Packaged: 2026-02-22 07:37:56 UTC; root
+Built: R 4.5.2; aarch64-apple-darwin20; 2026-02-22 07:39:29 UTC; unix

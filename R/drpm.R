@@ -42,7 +42,8 @@ drpm_fit <- function(y,s_coords=NULL,
 	gamma <- matrix(0, nrow=nout, ncol=ntime*nsubject)
 	mu <- sig2 <- matrix(1, nrow=nout, ncol=ntime*nsubject)
 	theta <- tau2 <- alpha_out <- matrix(0.5, nrow=nout, ncol=ntime);
-	eta1 <- matrix(0, nrow=nout, ncol=nsubject);
+	eta1 <- ppred <- rbpred <- matrix(0, nrow=nout, ncol=nsubject);
+	predSi <- matrix(1, nrow=nout, ncol=nsubject);
 	phi0 <- phi1 <- lam2 <- rep(0, nout)
 	lpml <- waic <- rep(0,1)
 
@@ -106,6 +107,8 @@ drpm_fit <- function(y,s_coords=NULL,
 	              phi0.draws = as.double(phi0), phi1.draws = as.double(phi1),
 	              lam2.draws = as.double(lam2), gamma.draws=as.integer(gamma),
 	              alpha.draws = as.double(alpha_out),fitted.draws = as.double(fitted),
+	              ppred.draws = as.double(ppred), rbpred.draws = as.double(rbpred),
+	              predSi.draws = as.integer(predSi),
 	              llike.draws=as.double(llike),lpml.out = as.double(lpml),
 	              waic.out = as.double(waic))
 
@@ -130,9 +133,12 @@ drpm_fit <- function(y,s_coords=NULL,
 	              theta.draws = as.double(theta), tau2.draws = as.double(tau2),
 	              phi0.draws = as.double(phi0), phi1.draws = as.double(phi1),
 	              lam2.draws = as.double(lam2), gamma.draws=as.integer(gamma),
-	              alpha.draws = as.double(alpha_out),fitted.draws = as.double(fitted),
-	              llike.draws=as.double(llike),lpml.out = as.double(lpml),
-	              waic.out = as.double(waic))
+	              alpha.draws = as.double(alpha_out),
+	              fitted.draws = as.double(fitted),
+	              ppred.draws = as.double(ppred), rbpred.draws = as.double(rbpred),
+	              predSi.draws = as.integer(predSi),
+	              llike.draws=as.double(llike),
+	              lpml.out = as.double(lpml),waic.out = as.double(waic))
 	}
 
 #}
@@ -158,6 +164,9 @@ drpm_fit <- function(y,s_coords=NULL,
 
   out$llike <- array(C.out$llike.draws, c(ntime,nsubject,nout))[1:ntime_out,,,drop=FALSE]
   out$fitted <- array(C.out$fitted.draws, c(ntime,nsubject,nout))[1:ntime_out,,,drop=FALSE]
+  out$ppred <- matrix(C.out$ppred.draws,nrow=nout, byrow=TRUE)
+  out$rbpred <- matrix(C.out$rbpred.draws,nrow=nout, byrow=TRUE)
+  out$predSi <- matrix(C.out$predSi.draws,nrow=nout, byrow=TRUE)
   out$lpml <- C.out$lpml.out
   out$waic <- C.out$waic.out
 
@@ -175,6 +184,9 @@ drpm_fit <- function(y,s_coords=NULL,
     out$tau2 <- theta_tau2[2]
     out$llike <- array(C.out$llike.draws, c(ntime,nsubject,nout))[1:ntime_out,,,drop=FALSE]
     out$fitted <- array(C.out$fitted.draws, c(ntime,nsubject,nout))[1:ntime_out,,,drop=FALSE]
+    out$ppred <- matrix(C.out$ppred.draws,nrow=nout, byrow=TRUE)
+    out$rbpred <- matrix(C.out$rbpred.draws,nrow=nout, byrow=TRUE)
+    out$predSi <- matrix(C.out$predSi.draws,nrow=nout, byrow=TRUE)
     out$lpml <- C.out$lpml.out
     out$waic <- C.out$waic.out
     out$initial_partition = initial_partition

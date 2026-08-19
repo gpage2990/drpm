@@ -88,7 +88,8 @@ void informed_ar1_sppm(int *draws, int *burn, int *thin,
 			  int *space_1, int *simpleModel, double *theta_tau2,
 			  int *Si, double *mu, double *sig2, double *eta1, double *theta, double *tau2, 
 			  double *phi0, double *phi1, double *lam2, int *gamma, double *alpha_out, 
-			  double *fitted, double *llike, double *lpml, double *waic){
+			  double *fitted, double *ppred, double *rbpred, int *predSi,
+			  double *llike, double *lpml, double *waic){
 				
 
 
@@ -303,8 +304,10 @@ void informed_ar1_sppm(int *draws, int *burn, int *thin,
   double *mnlike = R_VectorInit((*nsubject)*(ntime1), 0.0);
   double *mnllike = R_VectorInit((*nsubject)*(ntime1), 0.0);
 
-  // stuff to predict
-  // int gpred[*nsubject], nh_pred[*nsubject];
+  // stuff for prediction
+  int gpred[*nsubject], nh_pred[*nsubject], predSi_iter[*nsubject];
+  double sdraw, mn;
+  double ppred_iter[*nsubject], rbpred_iter[*nsubject];
 
 
   // ===================================================================================		
@@ -1733,126 +1736,121 @@ void informed_ar1_sppm(int *draws, int *burn, int *thin,
     lam2_iter = 1.0/rgamma(astar, 1/bstar);
     
 //    Rprintf("lam2_iter = %f\n", lam2_iter);
-    
-
-    	//////////////////////////////////////////////////////////////////////////////
-    	//																			//
-    	// predict partition for new time period				 	   				//
-    	//																			//
-    	//////////////////////////////////////////////////////////////////////////////
-    
-    	for(p = 0; p < *npred; p++){
-    		
-    		for(j=0; j<*nsubject; j++){ 
-    			nh_pred[j] = 0;
-    			predSi_iter[j*(*npred) + p] = 0;
-    		}
-    		RprintIVecAsMat("nh_pred", nh_pred, 1, *nsubject);
-    
-    		if(*update_alpha == 0){		
-    			n_red = 0;
-    			for(j=0;j<*nsubject;j++){
-    		
-    				gpred[j] = rbinom(1,*alpha);
-    				
-    				if(gpred[j] == 1){
-    					nh_pred[Si_iter[j*(ntime1)+(*ntime)-1] - 1] = nh_pred[Si_iter[j*(ntime1)+(*ntime)-1] - 1] + 1;
-    					n_red = n_red + 1;	
-    
-    					predSi_iter[j*(*npred) + p] = Si_iter[j*(ntime1)+(*ntime)-1];
-    				}
-    			}
-    
-    		}
-    
-    
-    		if(*update_alpha == 1){
-    			if(*time_specific_alpha == 1){
-    				
-    				
-    				n_red = 0;
-    				for(j=0;j<*nsubject;j++){
-    		
-    					gpred[j] = rbinom(1,alpha_iter[1]);
-    
-    					if(gpred[j] == 1){
-    						nh_pred[Si_iter[j*(ntime1)+(*ntime)-1] - 1] = nh_pred[Si_iter[j*(ntime1)+(*ntime)-1] - 1] + 1;
-    						n_red = n_red + 1;	
-    
-    						predSi_iter[j*(*npred) + p] = Si_iter[j*(ntime1)+(*ntime)-1];
-    					}
-    				}	
-    			
-    			}else {
-    			
-    			}
-    		}
-    
-    		RprintIVecAsMat("predSi_iter", predSi_iter, *npred, *nsubject);
-    		RprintIVecAsMat("gpred", gpred, 1, *nsubject);
-    		RprintIVecAsMat("nh_pred", nh_pred, 1, *nsubject);
-    		Rprintf("n_red = %d\n", n_red);
-    
-    		remove_zero(nh_pred, *nsubject, nh_tmp_no_zero);
-    		RprintIVecAsMat("nh_tmp_no_zero", nh_tmp_no_zero, 1, *nsubject);
-    
-    		nclus_tmp = 0;				
-    		for(j=0; j<*nsubject;j++){
-    			if(nh_tmp_no_zero[j] > 0){
-    				nclus_tmp = nclus_tmp + 1;
-    			}else{
-    				break;
-    			}
-    		}
-    
-    		Rprintf("nclus_tmp = %d\n", nclus_tmp);
-    			
-    		for(j=0;j<*nsubject;j++){
-    			Rprintf("j = %d\n", j);
-    			if(gpred[j] == 0){
-    				for(k = 0; k < nclus_tmp; k++){
-    					probh[k] = nh_pred[k]/(n_red + Mdp);
-    				}
-    				probh[nclus_tmp] = Mdp/(n_red + Mdp);
-    				
-    				RprintVecAsMat("probh = ", probh, 1, nclus_tmp+1);
-    
-    				uu = runif(0.0,1.0);
-    
-    				cprobh= 0.0;;
-    				for(k = 0; k < nclus_tmp+1; k++){
-    
-    					cprobh = cprobh + probh[k];
-    
-    					if (uu < cprobh){
-    								
-    						iaux = k+1;
-    						break;	
-    					}
-    				}		
-    					
-    				Rprintf("iaux = %d\n", iaux);
-    				if(iaux <= nclus_tmp){
-    
-    					predSi_iter[j*(*npred) + p] = iaux;
-    					nh_pred[iaux-1] = nh_pred[iaux-1] + 1;
-    				}else{
-    		
-    					nclus_tmp = nclus_tmp + 1;
-    					predSi_iter[j*(*npred) + p] = nclus_tmp;
-    					nh_pred[(predSi_iter[j*(*npred) + p]-1)*(*npred)+p] = 1;			
-    				
-    				}
-    				n_red = n_red + 1;
-    
-    				RprintIVecAsMat("predSi_iter", predSi_iter, *npred, *nsubject);
-    				RprintIVecAsMat("nh_pred", nh_pred, 1, *nsubject);
-    				Rprintf("nclus_tmp = %d\n", nclus_tmp);
-    				Rprintf("n_red = %d\n", n_red);
-    			}
-    		}
-    	}	
 */ 
+    
+    //////////////////////////////////////////////////////////////////////////////
+    //																			//
+    // predict partition and response for new time period				 	   	//
+    //																			//
+    //////////////////////////////////////////////////////////////////////////////
+    
+    for(j = 0; j < *nsubject; j++){
+      
+      // My first attempt at prediction is the simple case when no spatial
+      // information is available.
+      if(!(*sPPM)){
+      
+        // if alpha is not updated, i.e., it is fixed, then I sample gamma from
+        // a Ber(alpha)
+        if(*update_alpha == 0){
+          gpred[j] = rbinom(1, *alpha);
+        }
+        
+        // if alpha is updated globally, then use alpha's posterior sample
+        if(*update_alpha == 1){
+          if(*time_specific_alpha != 1){
+            gpred[j] = rbinom(1, alpha_iter[1]); // note with global alpha, all alpha_iter entries are equal
+          }
+          if(*time_specific_alpha == 1){
+            gpred[j] = rbinom(1, alpha_iter[*ntime]); // with time-specific alpha, use last time point
+          }
+        }
+        
+        // if gpred is 1, then the prediction cluster is pegged to previous cluster label
+        if(gpred[j] == 1){
+          iaux = Si_iter[j*(ntime1)+(*ntime)-1];
+        }
+        
+        RprintIVecAsMat("nclus_iter", nclus_iter, 1, ntime1);
+        RprintIVecAsMat("nh_pred", nh_pred, 1, nclus_iter[*ntime-1]);
+        Rprintf("nclus_iter[*ntime] = %d\n", nclus_iter[*ntime-1]);
+        // if grped is 0, then use the typical predictive probability
+        if(gpred[j] == 0){
+          for(k = 0; k < nclus_iter[*ntime-1]; k++){
+            ph[k] = log((double) nh_pred[k]);
+          }
+          ph[nclus_iter[*ntime-1]] = log(*M);
+           
+          maxph = ph[0];
+          for(k = 1; k < nclus_iter[*ntime-1]+1; k++){
+            if(ph[k] > maxph) maxph=ph[k];
+          }
+    
+          denph = 0.0;
+          for(k = 0; k < nclus_iter[*ntime-1]+1; k++){
+            ph[k] = exp(ph[k] - maxph);
+            denph = denph + ph[k];
+          }
+    
+          for(k = 0; k < nclus_iter[*ntime-1]+1; k++){
+            probh[k] = ph[k]/denph;
+          }
+          RprintVecAsMat("probh", probh, 1, nclus_iter[*ntime-1]+1);
+          uu = runif(0.0,1.0);
+          Rprintf("uu = %f\n", uu);
+          cprobh= 0.0;
+           
+          for(k = 0; k < nclus_iter[*ntime-1]+1; k++){
+            cprobh = cprobh + probh[k];
+            if (uu < cprobh){
+              iaux = k+1;
+              break;
+            }
+          }
+        }
+        
+        predSi_iter[j] = iaux;
+        
+        RprintIVecAsMat("gpred", gpred, 1, *nsubject);
+        RprintIVecAsMat("predSi_iter", predSi_iter, 1, *nsubject);
+        RprintIVecAsMat("Si_iter", Si_iter, *nsubject, ntime1);
+        
+        
+        if(iaux <= nclus_iter[*ntime-1]){
+          mudraw = muh[(iaux-1)*(ntime1) + *ntime-1];
+          sdraw = sqrt(sig2h[(iaux-1)*(ntime1) + *ntime-1]);
+        }else{
+          mudraw = rnorm(theta_iter[*ntime-1],sqrt(tau2_iter[*ntime-1]));
+          sdraw = runif(0, Asig);
+          if(*simpleModel) sdraw = 1.0;
+        }
+        Rprintf("mudraw = %f\n", mudraw);
+        Rprintf("sdraw = %f\n", sdraw);
+    
+        ppred_iter[j] = rnorm(mudraw, sdraw);
+    
+        mn = 0.0;
+        for(k = 0; k < nclus_iter[*ntime-1]; k++){
+          mn = mn +  muh[k*(ntime1) + *ntime-1]*probh[k];
+        }
+        Rprintf("mn = %f\n", mn);
+    
+        mn = mn + rnorm(theta_iter[*ntime-1],sqrt(tau2_iter[*ntime-1]))*probh[nclus_iter[*ntime-1]];
+        rbpred_iter[j] = mn;
+        if(gpred[j] == 1) rbpred_iter[j] = ppred_iter[j];
+        Rprintf("gpred[j] = %d\n", gpred[j]);
+        Rprintf("ppred[j] = %f\n", ppred_iter[j]);
+        Rprintf("rbpred[j] = %f\n", rbpred_iter[j]);
+    
+      }
+      
+      if(*sPPM){
+      
+        // I still need to code up the prediction if spatial information is
+        // available.  This will be similar to what is done in the rPPM code.
+      
+      }
+    }
 
 
    
@@ -1940,6 +1938,9 @@ void informed_ar1_sppm(int *draws, int *burn, int *thin,
     
       for(j=0; j<*nsubject; j++){
         eta1[ii*(*nsubject) + j] = eta1_iter[j];
+		ppred[ii*(*nsubject) + j] = ppred_iter[j];
+		rbpred[ii*(*nsubject) + j] = rbpred_iter[j];
+		predSi[ii*(*nsubject) + j] = predSi_iter[j];
       }
     
       phi1[ii] = phi1_iter;

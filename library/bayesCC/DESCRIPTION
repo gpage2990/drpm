@@ -1,0 +1,30 @@
+Package: bayesCC
+Type: Package
+Title: Bayesian consensus clustering
+Version: 0.6
+Date: 2023-05-11
+Author: Eric F. Lock
+Maintainer: Tim Triche, Jr. <tim.triche@gmail.com>
+Description: Loosely coupled clustering over multiple data types.
+Depends: impute, gtools, gplots
+Imports: RcppML
+Suggests: vioplot, parallel
+VignetteBuilder: knitr
+License: MIT
+Collate: alignMatrices.R alignVectors.R alignClusters.R alphaStar.R
+        logSum.R bayesCC.R BCC.R BRCAData.R jointNMF.R earlyReduction.R
+RoxygenNote: 7.2.3
+Encoding: UTF-8
+RemoteType: github
+RemoteHost: api.github.com
+RemoteRepo: bayesCC
+RemoteUsername: ttriche
+RemoteRef: HEAD
+RemoteSha: 627a88a5af1b07b4923ecba42174d4c148df29c2
+GithubRepo: bayesCC
+GithubUsername: ttriche
+GithubRef: HEAD
+GithubSHA1: 627a88a5af1b07b4923ecba42174d4c148df29c2
+NeedsCompilation: no
+Packaged: 2026-07-28 15:41:28 UTC; gpage
+Built: R 4.5.2; ; 2026-07-28 15:41:30 UTC; unix

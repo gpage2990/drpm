@@ -1,0 +1,17 @@
+BCC                     alias to bayesCC(...)
+BRCAData                Data from TCGA BRCA paper, as used in Lock &
+                        Dunson, Bioinformatics 2013.
+alignClusters           Align cluster label vectors or cluster label
+                        matrices as needed
+alignMatrices           Align matrices of cluster labels.
+alignVectors            Align vectors of cluster labels.
+alphaStar               compute mean adjusted adherence, the
+                        recommended figure of merit for bayesCC
+bayesCC                 Bayesian Consensus Clustering
+earlyReduction          do dimension reduction (via NMF or SVD) before
+                        Bayesian consensus clustering
+jointNMF                attempt a joint nonnegative matrix
+                        factorization of two matrices, as described in
+                        Wang et al. 2014,
+                        doi:10.1093/bioinformatics/btu679
+logSum                  convenience function

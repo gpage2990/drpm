@@ -1,0 +1,3 @@
+drpm_fit                Function that fits spatio-temporal hierarchical
+                        Gaussian model with a dependent random
+                        partition model
